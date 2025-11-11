@@ -126,13 +126,16 @@ docker {
   buildx shouldUseBuildx
   if (shouldUseBuildx && !pushContainers) {
     platform("linux/${project.nativeArchitecture()}")
+    load true
   } else if (shouldUseBuildx && pushContainers) {
     def containerPlatforms = project.containerPlatforms()
     if (!containerPlatforms.isEmpty()) {
       platform(*containerPlatforms)
     }
+    load false
+  } else {
+    load false
   }
-  load shouldUseBuildx && !pushContainers
   push pushContainers
 }
 
