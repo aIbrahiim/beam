@@ -28,6 +28,10 @@ goBuild {
 }
 
 def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
+def shouldLoad = !pushContainers
+def useBuildxForThis = project.useBuildx() && !shouldLoad
+def containerPlatforms = project.containerPlatforms()
+def platforms = useBuildxForThis ? containerPlatforms : []
 
 docker {
   name containerImageName(
@@ -40,9 +44,11 @@ docker {
   files "./build/"
   buildArgs(['pull_licenses': project.rootProject.hasProperty(["docker-pull-licenses"]) ||
                      project.rootProject.hasProperty(["isRelease"])])
-  buildx project.useBuildx()
-  platform(*project.containerPlatforms())
-  load project.useBuildx() && !pushContainers
+  buildx useBuildxForThis
+  if (useBuildxForThis && !platforms.isEmpty()) {
+    platform(*platforms)
+  }
+  load false
   push pushContainers
 }
 dockerPrepare.dependsOn tasks.named("goBuild")
