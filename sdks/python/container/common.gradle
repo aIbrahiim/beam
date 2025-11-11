@@ -128,23 +128,18 @@ docker {
 
 project.afterEvaluate {
   def shouldUseBuildx = project.useBuildx()
-  if (shouldUseBuildx && !pushContainers) {
-    docker.platform("linux/${project.nativeArchitecture()}")
-    docker.load = true
-  } else if (shouldUseBuildx && pushContainers) {
-    def containerPlatforms = project.containerPlatforms()
-    if (containerPlatforms.size() > 1) {
-      // Multi-platform - can't load, must push directly
+  def containerPlatforms = project.containerPlatforms()
+  
+  if (shouldUseBuildx) {
+    if (!containerPlatforms.isEmpty()) {
       docker.platform(*containerPlatforms)
-      docker.load = false
     } else {
-      // Single platform - can load and push
       docker.platform("linux/${project.nativeArchitecture()}")
-      docker.load = true
     }
-  } else {
-    docker.load = false
   }
+  // Set load: true when using buildx and not pushing, or when pushing single-platform
+  // Multi-platform images can't be loaded, so load = false in that case
+  docker.load = shouldUseBuildx && (!pushContainers || containerPlatforms.size() <= 1)
 }
 
 dockerPrepare.dependsOn copyLauncherDependencies
