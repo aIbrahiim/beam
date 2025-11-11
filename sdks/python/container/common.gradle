@@ -133,10 +133,15 @@ project.afterEvaluate {
     docker.load = true
   } else if (shouldUseBuildx && pushContainers) {
     def containerPlatforms = project.containerPlatforms()
-    if (!containerPlatforms.isEmpty()) {
+    if (containerPlatforms.size() > 1) {
+      // Multi-platform - can't load, must push directly
       docker.platform(*containerPlatforms)
+      docker.load = false
+    } else {
+      // Single platform - can load and push
+      docker.platform("linux/${project.nativeArchitecture()}")
+      docker.load = true
     }
-    docker.load = false
   } else {
     docker.load = false
   }
