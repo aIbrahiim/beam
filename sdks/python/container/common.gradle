@@ -126,6 +126,7 @@ docker {
   push pushContainers
 }
 
+// Configure docker extension after project evaluation
 project.afterEvaluate {
   def shouldUseBuildx = project.useBuildx()
   def containerPlatforms = project.containerPlatforms()
@@ -147,6 +148,14 @@ project.afterEvaluate {
   } else {
     docker.load = false
   }
+  
+  // Debug logging
+  project.logger.lifecycle("Docker config afterEvaluate - buildx: ${docker.buildx}, load: ${docker.load}, push: ${docker.push}, pushContainers: ${pushContainers}, shouldUseBuildx: ${shouldUseBuildx}, platforms: ${containerPlatforms}")
+  
+  // Force re-evaluation by accessing the extension again
+  // This ensures our changes are picked up even if plugin's afterEvaluate ran first
+  def ext = docker
+  project.logger.lifecycle("Docker extension after re-access - buildx: ${ext.buildx}, load: ${ext.load}, push: ${ext.push}")
 }
 
 dockerPrepare.dependsOn copyLauncherDependencies
