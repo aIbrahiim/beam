@@ -28,9 +28,8 @@ goBuild {
 }
 
 def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
-def shouldLoad = !pushContainers
-def useBuildxForThis = project.useBuildx() && !shouldLoad
 def containerPlatforms = project.containerPlatforms()
+def useBuildxForThis = pushContainers && project.useBuildx()
 def platforms = useBuildxForThis ? containerPlatforms : []
 
 docker {
