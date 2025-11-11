@@ -107,7 +107,6 @@ def copyLauncherDependencies = tasks.register("copyLauncherDependencies", Copy) 
 }
 
 def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
-def shouldUseBuildx = project.useBuildx()
 
 docker {
   name containerImageName(
@@ -123,24 +122,17 @@ docker {
   buildArgs(['py_version': "${project.ext.pythonVersion}",
              'pull_licenses': project.rootProject.hasProperty(["docker-pull-licenses"]) ||
                      project.rootProject.hasProperty(["isRelease"])])
-  buildx shouldUseBuildx
-  if (shouldUseBuildx) {
-    if (pushContainers) {
-      def containerPlatforms = project.containerPlatforms()
-      if (!containerPlatforms.isEmpty()) {
-        platform(*containerPlatforms)
-      }
-      load false
-      push true
-    } else {
-      platform("linux/${project.nativeArchitecture()}")
-      load true
-      push false
+  buildx project.useBuildx()
+  if (project.useBuildx() && !pushContainers) {
+    platform("linux/${project.nativeArchitecture()}")
+  } else if (project.useBuildx() && pushContainers) {
+    def containerPlatforms = project.containerPlatforms()
+    if (!containerPlatforms.isEmpty()) {
+      platform(*containerPlatforms)
     }
-  } else {
-    load false
-    push pushContainers
   }
+  load project.useBuildx() && !pushContainers
+  push pushContainers
 }
 
 dockerPrepare.dependsOn copyLauncherDependencies
