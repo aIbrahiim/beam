@@ -37,6 +37,7 @@ dependencies {
 }
 
 def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
+def useBuildx = project.useBuildx()
 
 def base_name = "${project.docker_image_default_repo_prefix}java${imageJavaVersion}_sdk"
 def root = project.rootProject.hasProperty(["docker-repository-root"]) ?
@@ -62,16 +63,19 @@ docker {
             'BEAM_BASE': base,
             'DISTROLESS_BASE': "gcr.io/distroless/java${imageJavaVersion}-debian12"
     ])
-    buildx project.useBuildx()
-    if (project.useBuildx() && !pushContainers) {
+    buildx useBuildx
+    if (useBuildx && !pushContainers) {
         platform("linux/${project.nativeArchitecture()}")
-    } else if (project.useBuildx() && pushContainers) {
+        load true
+    } else if (useBuildx && pushContainers) {
         def containerPlatforms = project.containerPlatforms()
         if (!containerPlatforms.isEmpty()) {
             platform(*containerPlatforms)
         }
+        load false
+    } else {
+        load false
     }
-    load project.useBuildx() && !pushContainers
     push pushContainers
 }
 

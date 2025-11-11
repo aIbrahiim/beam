@@ -94,6 +94,7 @@ task skipPullLicenses(type: Exec) {
 }
 
 def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
+def useBuildx = project.useBuildx()
 
 docker {
     name containerImageName(
@@ -113,16 +114,19 @@ docker {
             'base_image': javaBaseImage,
             'java_version': imageJavaVersion,
     ])
-    buildx project.useBuildx()
-    if (project.useBuildx() && !pushContainers) {
+    buildx useBuildx
+    if (useBuildx && !pushContainers) {
         platform("linux/${project.nativeArchitecture()}")
-    } else if (project.useBuildx() && pushContainers) {
+        load true
+    } else if (useBuildx && pushContainers) {
         def containerPlatforms = project.containerPlatforms()
         if (!containerPlatforms.isEmpty()) {
             platform(*containerPlatforms)
         }
+        load false
+    } else {
+        load false
     }
-    load project.useBuildx() && !pushContainers
     push pushContainers
 }
 
