@@ -44,17 +44,19 @@ docker {
   buildx useBuildx
   if (useBuildx && !pushContainers) {
     platform("linux/${project.nativeArchitecture()}")
-    load true
   } else if (useBuildx && pushContainers) {
     def containerPlatforms = project.containerPlatforms()
     if (!containerPlatforms.isEmpty()) {
       platform(*containerPlatforms)
     }
-    load false
-  } else {
-    load false
   }
   push pushContainers
+}
+
+project.afterEvaluate {
+  if (docker.buildx && !pushContainers) {
+    docker.load = true
+  }
 }
 dockerPrepare.dependsOn tasks.named("goBuild")
 
