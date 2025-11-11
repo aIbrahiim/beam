@@ -107,12 +107,6 @@ def copyLauncherDependencies = tasks.register("copyLauncherDependencies", Copy) 
 }
 
 def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
-def containerPlatforms = project.containerPlatforms()
-def useBuildxForThis = false
-if (pushContainers) {
-  useBuildxForThis = project.useBuildx()
-}
-def platforms = useBuildxForThis ? containerPlatforms : []
 
 docker {
   name containerImageName(
@@ -128,11 +122,21 @@ docker {
   buildArgs(['py_version': "${project.ext.pythonVersion}",
              'pull_licenses': project.rootProject.hasProperty(["docker-pull-licenses"]) ||
                      project.rootProject.hasProperty(["isRelease"])])
-  buildx useBuildxForThis
-  if (useBuildxForThis && !platforms.isEmpty()) {
-    platform(*platforms)
+  if (pushContainers && project.useBuildx()) {
+    buildx true
+    def containerPlatforms = project.containerPlatforms()
+    if (!containerPlatforms.isEmpty()) {
+      platform(*containerPlatforms)
+    }
+    load false
+  } else if (!pushContainers && project.useBuildx()) {
+    buildx true
+    platform("linux/${project.nativeArchitecture()}")
+    load true
+  } else {
+    buildx false
+    load false
   }
-  load false
   push pushContainers
 }
 
