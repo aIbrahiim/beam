@@ -104,10 +104,8 @@ jobs:
           tmpfs-run-size: 2g
           tmpfs-varrun-size: 4g
           export-gh-env: "true"
-          # Increase timeout for self-hosted runners which may be slower
-          wait-timeout: "300"
-          health-start-period: "30s"
-          health-retries: "90"
+          # Use host network mode to avoid port conflicts on self-hosted runners
+          use-host-network: "true"
       - name: Run preCommitPyCoverage
         env:
           DOCKER_HOST: ${{ contains(matrix.os, 'self-hosted') && steps.dind.outputs.docker-host || '' }}
