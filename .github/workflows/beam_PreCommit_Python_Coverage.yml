@@ -104,8 +104,9 @@ jobs:
           tmpfs-run-size: 2g
           tmpfs-varrun-size: 4g
           export-gh-env: "true"
-          # Use host network mode to avoid port conflicts on self-hosted runners
+          # Use host network mode with different port to avoid conflicts on self-hosted runners
           use-host-network: "true"
+          port: "2376"
       - name: Run preCommitPyCoverage
         env:
           DOCKER_HOST: ${{ contains(matrix.os, 'self-hosted') && steps.dind.outputs.docker-host || '' }}
