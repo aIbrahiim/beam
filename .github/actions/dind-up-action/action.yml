@@ -172,13 +172,33 @@ runs:
         PORT="${{ inputs.port || '2375' }}"
         TIMEOUT="${{ inputs.wait-timeout || '180' }}"
         echo "Waiting for Docker-in-Docker to be ready..."
-        if ! timeout ${TIMEOUT}s bash -c 'until docker -H "tcp://'"${HOST}"':'"${PORT}"'" info >/dev/null 2>&1; do sleep 2; done'; then
-          echo "::error::DinD failed to start within ${TIMEOUT}s."
-          docker logs "$NAME" || true
-          exit 1
-        fi
-        echo "DinD is ready."
-        docker -H "tcp://${HOST}:${PORT}" info --format 'Daemon OK → OS={{.OperatingSystem}} Version={{.ServerVersion}}'
+        echo "Checking container status..."
+        docker ps -a --filter "name=$NAME" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" || true
+        echo "Checking container health..."
+        docker inspect "$NAME" --format='{{.State.Health.Status}}' 2>/dev/null || echo "Health check not available yet"
+        echo "Attempting to connect to DinD on tcp://${HOST}:${PORT}..."
+        ELAPSED=0
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+          if docker -H "tcp://${HOST}:${PORT}" info >/dev/null 2>&1; then
+            echo "DinD is ready after ${ELAPSED}s."
+            docker -H "tcp://${HOST}:${PORT}" info --format 'Daemon OK → OS={{.OperatingSystem}} Version={{.ServerVersion}}'
+            exit 0
+          fi
+          # Show progress every 30 seconds
+          if [ $((ELAPSED % 30)) -eq 0 ] && [ $ELAPSED -gt 0 ]; then
+            echo "Still waiting... (${ELAPSED}s/${TIMEOUT}s)"
+            docker logs --tail 20 "$NAME" 2>/dev/null || true
+            docker inspect "$NAME" --format='Health: {{.State.Health.Status}}' 2>/dev/null || true
+          fi
+          sleep 2
+          ELAPSED=$((ELAPSED + 2))
+        done
+        echo "::error::DinD failed to start within ${TIMEOUT}s."
+        echo "Container logs:"
+        docker logs "$NAME" || true
+        echo "Container inspect:"
+        docker inspect "$NAME" || true
+        exit 1
 
     - id: set-output
       shell: bash
