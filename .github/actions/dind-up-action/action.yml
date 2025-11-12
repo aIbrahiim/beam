@@ -172,6 +172,25 @@ runs:
         PORT="${{ inputs.port || '2375' }}"
         TIMEOUT="${{ inputs.wait-timeout || '180' }}"
         echo "Waiting for Docker-in-Docker to be ready..."
+        echo "Container: $NAME"
+        echo "Connecting to: tcp://${HOST}:${PORT}"
+        
+        # First wait for container health check to pass
+        echo "Waiting for container health check..."
+        HEALTH_TIMEOUT=60
+        HEALTH_ELAPSED=0
+        while [ $HEALTH_ELAPSED -lt $HEALTH_TIMEOUT ]; do
+          HEALTH=$(docker inspect "$NAME" --format='{{.State.Health.Status}}' 2>/dev/null || echo "starting")
+          if [[ "$HEALTH" == "healthy" ]]; then
+            echo "Container is healthy after ${HEALTH_ELAPSED}s"
+            break
+          fi
+          sleep 2
+          HEALTH_ELAPSED=$((HEALTH_ELAPSED + 2))
+        done
+        
+        # Now test TCP connection
+        echo "Testing TCP connection to tcp://${HOST}:${PORT}..."
         ELAPSED=0
         while [ $ELAPSED -lt $TIMEOUT ]; do
           if docker -H "tcp://${HOST}:${PORT}" info >/dev/null 2>&1; then
@@ -179,10 +198,27 @@ runs:
             docker -H "tcp://${HOST}:${PORT}" info --format 'Daemon OK → OS={{.OperatingSystem}} Version={{.ServerVersion}}'
             exit 0
           fi
+          # Show progress every 10 seconds
+          if [ $((ELAPSED % 10)) -eq 0 ] && [ $ELAPSED -gt 0 ]; then
+            echo "Still waiting... (${ELAPSED}s/${TIMEOUT}s)"
+            # Test if port is open
+            if command -v nc >/dev/null 2>&1; then
+              if nc -z "${HOST}" "${PORT}" 2>/dev/null; then
+                echo "Port ${PORT} is open, but Docker API not responding yet"
+              else
+                echo "Port ${PORT} is not accessible"
+              fi
+            fi
+          fi
           sleep 2
           ELAPSED=$((ELAPSED + 2))
         done
         echo "::error::DinD failed to start within ${TIMEOUT}s."
+        echo "Container status:"
+        docker ps -a --filter "name=$NAME" || true
+        echo "Container health:"
+        docker inspect "$NAME" --format='Health: {{.State.Health.Status}}' 2>/dev/null || true
+        echo "Container logs:"
         docker logs "$NAME" || true
         exit 1
 
