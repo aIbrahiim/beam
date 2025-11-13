@@ -153,6 +153,38 @@ class BeamDockerPlugin implements Plugin<Project> {
 
     project.afterEvaluate {
       ext.resolvePathsAndValidate()
+      
+      try {
+        if (project.ext.has('useBuildx') && ext.buildx) {
+          def shouldUseBuildx = project.useBuildx()
+          def pushContainers = project.rootProject.hasProperty(["isRelease"]) || 
+                               project.rootProject.hasProperty("push-containers")
+          def containerPlatforms = project.ext.has('containerPlatforms') ? 
+                                    project.containerPlatforms() : []
+          
+          if (!pushContainers && !ext.push) {
+            ext.load = true
+            if (ext.platform.isEmpty() || ext.platform.size() > 1) {
+              def nativeArch = project.ext.has('nativeArchitecture') ? 
+                              project.nativeArchitecture() : 'amd64'
+              ext.platform = ["linux/${nativeArch}"] as Set
+              logger.info("Docker buildx: Auto-configured single platform 'linux/${nativeArch}' for local load")
+            }
+          } else if (pushContainers || ext.push) {
+            if (ext.platform.isEmpty() && !containerPlatforms.isEmpty()) {
+              ext.platform = containerPlatforms as Set
+            }
+            if (ext.platform.size() > 1) {
+              ext.load = false
+            } else if (!ext.push && ext.platform.size() == 1) {
+              ext.load = true
+            }
+          }
+        }
+      } catch (Exception e) {
+        logger.debug("Could not auto-configure Docker buildx settings: ${e.message}")
+      }
+      
       String dockerDir = "${project.buildDir}/docker"
       clean.delete dockerDir
 

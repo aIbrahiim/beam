@@ -123,39 +123,8 @@ docker {
              'pull_licenses': project.rootProject.hasProperty(["docker-pull-licenses"]) ||
                      project.rootProject.hasProperty(["isRelease"])])
   buildx project.useBuildx()
+  platform(*project.containerPlatforms())
   push pushContainers
-}
-
-// Configure docker extension after project evaluation
-project.afterEvaluate {
-  def shouldUseBuildx = project.useBuildx()
-  def containerPlatforms = project.containerPlatforms()
-  
-  if (shouldUseBuildx && !pushContainers) {
-    // When not pushing, build for native platform only so we can load
-    docker.platform("linux/${project.nativeArchitecture()}")
-    docker.load = true
-  } else if (shouldUseBuildx && pushContainers) {
-    // When pushing, use configured platforms (may be multi-platform)
-    if (!containerPlatforms.isEmpty()) {
-      docker.platform(*containerPlatforms)
-      // Can't load multi-platform images
-      docker.load = containerPlatforms.size() <= 1
-    } else {
-      docker.platform("linux/${project.nativeArchitecture()}")
-      docker.load = true
-    }
-  } else {
-    docker.load = false
-  }
-  
-  // Debug logging
-  project.logger.lifecycle("Docker config afterEvaluate - buildx: ${docker.buildx}, load: ${docker.load}, push: ${docker.push}, pushContainers: ${pushContainers}, shouldUseBuildx: ${shouldUseBuildx}, platforms: ${containerPlatforms}")
-  
-  // Force re-evaluation by accessing the extension again
-  // This ensures our changes are picked up even if plugin's afterEvaluate ran first
-  def ext = docker
-  project.logger.lifecycle("Docker extension after re-access - buildx: ${ext.buildx}, load: ${ext.load}, push: ${ext.push}")
 }
 
 dockerPrepare.dependsOn copyLauncherDependencies

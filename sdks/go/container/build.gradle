@@ -41,28 +41,8 @@ docker {
   buildArgs(['pull_licenses': project.rootProject.hasProperty(["docker-pull-licenses"]) ||
                      project.rootProject.hasProperty(["isRelease"])])
   buildx project.useBuildx()
+  platform(*project.containerPlatforms())
   push pushContainers
-}
-
-project.afterEvaluate {
-  def shouldUseBuildx = project.useBuildx()
-  if (shouldUseBuildx && !pushContainers) {
-    docker.platform("linux/${project.nativeArchitecture()}")
-    docker.load = true
-  } else if (shouldUseBuildx && pushContainers) {
-    def containerPlatforms = project.containerPlatforms()
-    if (containerPlatforms.size() > 1) {
-      // Multi-platform - can't load, must push directly
-      docker.platform(*containerPlatforms)
-      docker.load = false
-    } else {
-      // Single platform - can load and push
-      docker.platform("linux/${project.nativeArchitecture()}")
-      docker.load = true
-    }
-  } else {
-    docker.load = false
-  }
 }
 dockerPrepare.dependsOn tasks.named("goBuild")
 
