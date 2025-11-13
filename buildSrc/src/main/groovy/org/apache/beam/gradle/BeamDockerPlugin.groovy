@@ -162,32 +162,38 @@ class BeamDockerPlugin implements Plugin<Project> {
           def containerPlatforms = project.ext.has('containerPlatforms') ? 
                                     project.containerPlatforms() : []
           
+          logger.info("Docker buildx auto-config: buildx=${ext.buildx}, push=${ext.push}, pushContainers=${pushContainers}, shouldUseBuildx=${shouldUseBuildx}, platform=${ext.platform}, load=${ext.load}")
+          
           if (!pushContainers && !ext.push) {
             ext.load = true
             if (ext.platform.size() > 1) {
               def nativeArch = project.ext.has('nativeArchitecture') ? 
                               project.nativeArchitecture() : 'amd64'
               ext.platform = ["linux/${nativeArch}"] as Set
-              logger.info("Docker buildx: Forced single platform 'linux/${nativeArch}' for local load (was multi-platform)")
+              logger.info("Docker buildx: Forced single platform 'linux/${nativeArch}' for local load (was multi-platform: ${containerPlatforms})")
             } else if (ext.platform.isEmpty()) {
               def nativeArch = project.ext.has('nativeArchitecture') ? 
                               project.nativeArchitecture() : 'amd64'
               ext.platform = ["linux/${nativeArch}"] as Set
               logger.info("Docker buildx: Auto-configured single platform 'linux/${nativeArch}' for local load")
             }
+            logger.info("Docker buildx: Set load=true for local build, final platform=${ext.platform}")
           } else if (pushContainers || ext.push) {
             if (ext.platform.isEmpty() && !containerPlatforms.isEmpty()) {
               ext.platform = containerPlatforms as Set
             }
             if (ext.platform.size() > 1) {
               ext.load = false
+              logger.info("Docker buildx: Set load=false for multi-platform push, platform=${ext.platform}")
             } else if (!ext.push && ext.platform.size() == 1) {
               ext.load = true
+              logger.info("Docker buildx: Set load=true for single-platform push, platform=${ext.platform}")
             }
           }
+          logger.info("Docker buildx final config: load=${ext.load}, push=${ext.push}, platform=${ext.platform}")
         }
       } catch (Exception e) {
-        logger.warn("Could not auto-configure Docker buildx settings: ${e.message}")
+        logger.warn("Could not auto-configure Docker buildx settings: ${e.message}", e)
       }
       
       String dockerDir = "${project.buildDir}/docker"
@@ -205,7 +211,7 @@ class BeamDockerPlugin implements Plugin<Project> {
 
       exec.with {
         workingDir dockerDir
-        commandLine buildCommandLine(ext)
+        commandLine { buildCommandLine(ext) }
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
@@ -267,14 +273,17 @@ class BeamDockerPlugin implements Plugin<Project> {
       if (!ext.platform.isEmpty()) {
         buildCommandLine.addAll('--platform', String.join(',', ext.platform))
       }
+      logger.info("Docker buildx buildCommandLine: load=${ext.load}, push=${ext.push}, platform=${ext.platform}")
       if (ext.load) {
         buildCommandLine.add '--load'
+        logger.info("Docker buildx: Added --load flag")
       }
       if (ext.push) {
         buildCommandLine.add '--push'
         if (ext.load) {
           throw new Exception("cannot combine 'push' and 'load' options")
         }
+        logger.info("Docker buildx: Added --push flag")
       }
       if (ext.builder != null) {
         buildCommandLine.addAll('--builder', ext.builder)
