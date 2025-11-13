@@ -164,7 +164,12 @@ class BeamDockerPlugin implements Plugin<Project> {
           
           if (!pushContainers && !ext.push) {
             ext.load = true
-            if (ext.platform.isEmpty() || ext.platform.size() > 1) {
+            if (ext.platform.size() > 1) {
+              def nativeArch = project.ext.has('nativeArchitecture') ? 
+                              project.nativeArchitecture() : 'amd64'
+              ext.platform = ["linux/${nativeArch}"] as Set
+              logger.info("Docker buildx: Forced single platform 'linux/${nativeArch}' for local load (was multi-platform)")
+            } else if (ext.platform.isEmpty()) {
               def nativeArch = project.ext.has('nativeArchitecture') ? 
                               project.nativeArchitecture() : 'amd64'
               ext.platform = ["linux/${nativeArch}"] as Set
@@ -182,7 +187,7 @@ class BeamDockerPlugin implements Plugin<Project> {
           }
         }
       } catch (Exception e) {
-        logger.debug("Could not auto-configure Docker buildx settings: ${e.message}")
+        logger.warn("Could not auto-configure Docker buildx settings: ${e.message}")
       }
       
       String dockerDir = "${project.buildDir}/docker"
