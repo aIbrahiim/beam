@@ -172,6 +172,9 @@ class BeamDockerPlugin implements Plugin<Project> {
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
+        doFirst {
+          commandLine buildCommandLine(ext)
+        }
       }
 
       Map<String, Object> tags = ext.namedTags.collectEntries { taskName, tagName ->
