@@ -168,10 +168,14 @@ class BeamDockerPlugin implements Plugin<Project> {
 
       exec.with {
         workingDir dockerDir
-        commandLine buildCommandLine(ext)
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
+        // Use doFirst to set commandLine at execution time, after all afterEvaluate
+        // blocks have run. This ensures ext.load is set correctly before building the command.
+        doFirst {
+          commandLine buildCommandLine(ext)
+        }
       }
 
       Map<String, Object> tags = ext.namedTags.collectEntries { taskName, tagName ->
