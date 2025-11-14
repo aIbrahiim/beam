@@ -42,9 +42,32 @@ docker {
                      project.rootProject.hasProperty(["isRelease"])])
   buildx project.useBuildx()
   platform(*project.containerPlatforms())
-  load project.useBuildx() && !pushContainers
   push pushContainers
 }
+
+project.afterEvaluate {
+  def shouldUseBuildx = project.useBuildx()
+  def containerPlatforms = project.containerPlatforms()
+  if (shouldUseBuildx && !pushContainers) {
+    // For local builds with buildx, force single platform and load into local daemon
+    docker.platform("linux/${project.nativeArchitecture()}")
+    docker.load = true
+  } else if (shouldUseBuildx && pushContainers) {
+    if (containerPlatforms.size() > 1) {
+      // Multi-platform builds must use --push, cannot use --load
+      docker.platform(*containerPlatforms)
+      docker.load = false
+    } else {
+      // Single platform release build can be loaded
+      docker.platform("linux/${project.nativeArchitecture()}")
+      docker.load = true
+    }
+  } else {
+    // Not using buildx
+    docker.load = false
+  }
+}
+
 dockerPrepare.dependsOn tasks.named("goBuild")
 
 // Ensure that making the docker image builds any required artifacts
