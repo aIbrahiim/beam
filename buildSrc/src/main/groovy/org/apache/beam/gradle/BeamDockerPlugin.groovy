@@ -168,7 +168,7 @@ class BeamDockerPlugin implements Plugin<Project> {
 
       exec.with {
         workingDir dockerDir
-        commandLine buildCommandLine(ext)
+        commandLine { buildCommandLine(ext) }
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
