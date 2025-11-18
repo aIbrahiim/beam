@@ -204,7 +204,9 @@ class BeamDockerPlugin implements Plugin<Project> {
 
       exec.with {
         workingDir dockerDir
-        commandLine buildCommandLine(ext)
+        // Use lazy evaluation closure to ensure ext.load is read at execution time
+        // This ensures the value set in afterEvaluate above is used
+        commandLine { buildCommandLine(ext) }
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
