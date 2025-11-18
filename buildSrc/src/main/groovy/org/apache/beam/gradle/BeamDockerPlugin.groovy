@@ -160,11 +160,21 @@ class BeamDockerPlugin implements Plugin<Project> {
       // This must be done in the plugin's afterEvaluate to ensure it happens
       // before buildCommandLine is called
       def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
+      // Check both ext.buildx (set in docker block) and project.useBuildx() (current state)
+      // to handle cases where ext.buildx might not be set correctly
       def shouldUseBuildx = ext.buildx
+      def useBuildxMethod = project.hasProperty("useBuildx") ? project.useBuildx() : false
       def containerPlatforms = ext.platform ?: [] as Set
       def platformCount = containerPlatforms.size()
       
-      logger.lifecycle("Docker buildx config: buildx=${shouldUseBuildx}, pushContainers=${pushContainers}, platforms=${containerPlatforms}, platformCount=${platformCount}")
+      logger.lifecycle("Docker buildx config: ext.buildx=${shouldUseBuildx}, project.useBuildx()=${useBuildxMethod}, pushContainers=${pushContainers}, platforms=${containerPlatforms}, platformCount=${platformCount}")
+      
+      // Use the method result if ext.buildx seems wrong, or if we're actually using buildx
+      if (!shouldUseBuildx && useBuildxMethod) {
+        logger.lifecycle("ext.buildx is false but project.useBuildx() is true - using buildx method result")
+        shouldUseBuildx = true
+        ext.buildx = true
+      }
       
       if (shouldUseBuildx && !pushContainers) {
         // For local builds with buildx, force single platform and load into local daemon
@@ -187,10 +197,10 @@ class BeamDockerPlugin implements Plugin<Project> {
       } else {
         // Not using buildx
         ext.load = false
-        logger.lifecycle("Setting ext.load = false (not using buildx)")
+        logger.lifecycle("Setting ext.load = false (not using buildx: ext.buildx=${shouldUseBuildx}, useBuildxMethod=${useBuildxMethod})")
       }
       
-      logger.lifecycle("Final ext.load value: ${ext.load}")
+      logger.lifecycle("Final ext.load value: ${ext.load}, ext.buildx: ${ext.buildx}")
 
       prepare.with {
         with ext.copySpec
@@ -204,12 +214,14 @@ class BeamDockerPlugin implements Plugin<Project> {
 
       exec.with {
         workingDir dockerDir
-        // Use lazy evaluation closure to ensure ext.load is read at execution time
-        // This ensures the value set in afterEvaluate above is used
-        commandLine { buildCommandLine(ext) }
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
+        // Use doFirst to set commandLine at execution time, after ext.load is set in afterEvaluate
+        doFirst {
+          commandLine buildCommandLine(ext)
+          logger.lifecycle("Exec task doFirst: Setting commandLine with ext.load=${ext.load}")
+        }
       }
 
       Map<String, Object> tags = ext.namedTags.collectEntries { taskName, tagName ->
