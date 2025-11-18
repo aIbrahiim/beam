@@ -156,6 +156,32 @@ class BeamDockerPlugin implements Plugin<Project> {
       String dockerDir = "${project.buildDir}/docker"
       clean.delete dockerDir
 
+      // Set ext.load based on buildx and pushContainers settings
+      // This must be done in the plugin's afterEvaluate to ensure it happens
+      // before buildCommandLine is called
+      def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
+      def shouldUseBuildx = ext.buildx
+      def containerPlatforms = ext.platform
+      
+      if (shouldUseBuildx && !pushContainers) {
+        // For local builds with buildx, force single platform and load into local daemon
+        if (containerPlatforms.isEmpty() || containerPlatforms.size() > 1) {
+          ext.platform = ["linux/${project.nativeArchitecture()}"] as Set
+        }
+        ext.load = true
+      } else if (shouldUseBuildx && pushContainers) {
+        if (containerPlatforms.size() > 1) {
+          // Multi-platform builds must use --push, cannot use --load
+          ext.load = false
+        } else {
+          // Single platform release build can be loaded
+          ext.load = true
+        }
+      } else {
+        // Not using buildx
+        ext.load = false
+      }
+
       prepare.with {
         with ext.copySpec
         from(ext.resolvedDockerfile) {

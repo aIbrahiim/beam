@@ -42,8 +42,8 @@ docker {
                      project.rootProject.hasProperty(["isRelease"])])
   buildx project.useBuildx()
   platform(*project.containerPlatforms())
-  load project.useBuildx() && !pushContainers
   push pushContainers
+  // ext.load is now set automatically by BeamDockerPlugin based on buildx and pushContainers
 }
 dockerPrepare.dependsOn tasks.named("goBuild")
 

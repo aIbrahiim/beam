@@ -115,8 +115,8 @@ docker {
     ])
     buildx project.useBuildx()
     platform(*project.containerPlatforms())
-    load project.useBuildx() && !pushContainers
     push pushContainers
+    // ext.load is now set automatically by BeamDockerPlugin based on buildx and pushContainers
 }
 
 if (project.rootProject.hasProperty("docker-pull-licenses") ||

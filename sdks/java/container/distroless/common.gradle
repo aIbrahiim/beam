@@ -64,8 +64,8 @@ docker {
     ])
     buildx project.useBuildx()
     platform(*project.containerPlatforms())
-    load project.useBuildx() && !pushContainers
     push pushContainers
+    // ext.load is now set automatically by BeamDockerPlugin based on buildx and pushContainers
 }
 
 dockerPrepare.dependsOn ":sdks:java:container:java${imageJavaVersion}:docker"
