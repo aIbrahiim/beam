@@ -161,26 +161,36 @@ class BeamDockerPlugin implements Plugin<Project> {
       // before buildCommandLine is called
       def pushContainers = project.rootProject.hasProperty(["isRelease"]) || project.rootProject.hasProperty("push-containers")
       def shouldUseBuildx = ext.buildx
-      def containerPlatforms = ext.platform
+      def containerPlatforms = ext.platform ?: [] as Set
+      def platformCount = containerPlatforms.size()
+      
+      logger.lifecycle("Docker buildx config: buildx=${shouldUseBuildx}, pushContainers=${pushContainers}, platforms=${containerPlatforms}, platformCount=${platformCount}")
       
       if (shouldUseBuildx && !pushContainers) {
         // For local builds with buildx, force single platform and load into local daemon
-        if (containerPlatforms.isEmpty() || containerPlatforms.size() > 1) {
+        if (platformCount == 0 || platformCount > 1) {
           ext.platform = ["linux/${project.nativeArchitecture()}"] as Set
+          logger.lifecycle("Forcing single platform to: ${ext.platform}")
         }
         ext.load = true
+        logger.lifecycle("Setting ext.load = true for local buildx build")
       } else if (shouldUseBuildx && pushContainers) {
-        if (containerPlatforms.size() > 1) {
+        if (platformCount > 1) {
           // Multi-platform builds must use --push, cannot use --load
           ext.load = false
+          logger.lifecycle("Setting ext.load = false for multi-platform push build")
         } else {
           // Single platform release build can be loaded
           ext.load = true
+          logger.lifecycle("Setting ext.load = true for single-platform push build")
         }
       } else {
         // Not using buildx
         ext.load = false
+        logger.lifecycle("Setting ext.load = false (not using buildx)")
       }
+      
+      logger.lifecycle("Final ext.load value: ${ext.load}")
 
       prepare.with {
         with ext.copySpec
@@ -256,8 +266,12 @@ class BeamDockerPlugin implements Plugin<Project> {
       if (!ext.platform.isEmpty()) {
         buildCommandLine.addAll('--platform', String.join(',', ext.platform))
       }
+      logger.lifecycle("buildCommandLine: ext.load = ${ext.load}, ext.buildx = ${ext.buildx}, ext.push = ${ext.push}")
       if (ext.load) {
         buildCommandLine.add '--load'
+        logger.lifecycle("Added --load flag to buildx command")
+      } else {
+        logger.lifecycle("NOT adding --load flag (ext.load = ${ext.load})")
       }
       if (ext.push) {
         buildCommandLine.add '--push'
