@@ -167,13 +167,12 @@ class BeamDockerPlugin implements Plugin<Project> {
       def containerPlatforms = ext.platform ?: [] as Set
       def platformCount = containerPlatforms.size()
       
-      logger.lifecycle("Docker buildx config: ext.buildx=${shouldUseBuildx}, project.useBuildx()=${useBuildxMethod}, pushContainers=${pushContainers}, platforms=${containerPlatforms}, platformCount=${platformCount}")
+      logger.lifecycle("Docker buildx config: shouldUseBuildx=${shouldUseBuildx}, ext.buildx=${ext.buildx}, pushContainers=${pushContainers}, platforms=${containerPlatforms}, platformCount=${platformCount}")
       
-      // Use the method result if ext.buildx seems wrong, or if we're actually using buildx
-      if (!shouldUseBuildx && useBuildxMethod) {
-        logger.lifecycle("ext.buildx is false but project.useBuildx() is true - using buildx method result")
-        shouldUseBuildx = true
-        ext.buildx = true
+      // Ensure ext.buildx matches shouldUseBuildx
+      if (shouldUseBuildx != ext.buildx) {
+        logger.lifecycle("Updating ext.buildx from ${ext.buildx} to ${shouldUseBuildx}")
+        ext.buildx = shouldUseBuildx
       }
       
       if (shouldUseBuildx && !pushContainers) {
@@ -197,7 +196,7 @@ class BeamDockerPlugin implements Plugin<Project> {
       } else {
         // Not using buildx
         ext.load = false
-        logger.lifecycle("Setting ext.load = false (not using buildx: ext.buildx=${shouldUseBuildx}, useBuildxMethod=${useBuildxMethod})")
+        logger.lifecycle("Setting ext.load = false (not using buildx: shouldUseBuildx=${shouldUseBuildx})")
       }
       
       logger.lifecycle("Final ext.load value: ${ext.load}, ext.buildx: ${ext.buildx}")
@@ -217,10 +216,14 @@ class BeamDockerPlugin implements Plugin<Project> {
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
-        // Use doFirst to set commandLine at execution time, after ext.load is set in afterEvaluate
-        doFirst {
-          commandLine buildCommandLine(ext)
-          logger.lifecycle("Exec task doFirst: Setting commandLine with ext.load=${ext.load}")
+        // Set commandLine using a Callable that evaluates at execution time
+        // This ensures ext.load (set above) is read when the command is actually built
+        commandLine = new java.util.concurrent.Callable<List<String>>() {
+          @Override
+          List<String> call() {
+            logger.lifecycle("Callable.call() invoked: ext.load=${ext.load}, ext.buildx=${ext.buildx}")
+            return buildCommandLine(ext)
+          }
         }
       }
 
@@ -280,16 +283,23 @@ class BeamDockerPlugin implements Plugin<Project> {
       if (!ext.platform.isEmpty()) {
         buildCommandLine.addAll('--platform', String.join(',', ext.platform))
       }
-      logger.lifecycle("buildCommandLine: ext.load = ${ext.load}, ext.buildx = ${ext.buildx}, ext.push = ${ext.push}")
-      if (ext.load) {
+      
+      // Determine if we should load: if not pushing and buildx is used, we need --load
+      // Check project properties directly to ensure we get the current state
+      def pushContainers = ext.project.rootProject.hasProperty(["isRelease"]) || ext.project.rootProject.hasProperty("push-containers")
+      def shouldLoad = ext.load || (!ext.push && !pushContainers)
+      
+      logger.lifecycle("buildCommandLine: ext.load=${ext.load}, ext.buildx=${ext.buildx}, ext.push=${ext.push}, pushContainers=${pushContainers}, shouldLoad=${shouldLoad}")
+      
+      if (shouldLoad) {
         buildCommandLine.add '--load'
         logger.lifecycle("Added --load flag to buildx command")
       } else {
-        logger.lifecycle("NOT adding --load flag (ext.load = ${ext.load})")
+        logger.lifecycle("NOT adding --load flag (shouldLoad=${shouldLoad})")
       }
       if (ext.push) {
         buildCommandLine.add '--push'
-        if (ext.load) {
+        if (shouldLoad) {
           throw new Exception("cannot combine 'push' and 'load' options")
         }
       }
