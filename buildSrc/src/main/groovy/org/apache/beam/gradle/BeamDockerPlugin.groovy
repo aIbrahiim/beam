@@ -216,15 +216,15 @@ class BeamDockerPlugin implements Plugin<Project> {
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
-        // Set commandLine using a Callable that evaluates at execution time
-        // This ensures ext.load (set above) is read when the command is actually built
-        commandLine = new java.util.concurrent.Callable<List<String>>() {
-          @Override
-          List<String> call() {
-            logger.lifecycle("Callable.call() invoked: ext.load=${ext.load}, ext.buildx=${ext.buildx}")
-            return buildCommandLine(ext)
-          }
-        }
+        // Don't set commandLine here - it will be set in doFirst at execution time
+        // This ensures ext.load (set in afterEvaluate above) is read when the command is built
+      }
+      
+      // Set commandLine in doFirst to ensure it's evaluated after ext.load is set
+      exec.doFirst {
+        def cmd = buildCommandLine(ext)
+        exec.commandLine = cmd
+        logger.lifecycle("doFirst: Set commandLine with ext.load=${ext.load}, command=${cmd}")
       }
 
       Map<String, Object> tags = ext.namedTags.collectEntries { taskName, tagName ->
