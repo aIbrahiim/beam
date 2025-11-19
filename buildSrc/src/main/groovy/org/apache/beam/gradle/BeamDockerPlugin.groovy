@@ -29,6 +29,7 @@ import org.gradle.api.logging.Logging
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.Exec
+import org.gradle.process.CommandLineArgumentProvider
 
 /**
  * A gradle plug-in interacting with docker. Originally replicated from
@@ -168,7 +169,13 @@ class BeamDockerPlugin implements Plugin<Project> {
 
       exec.with {
         workingDir dockerDir
-        commandLine buildCommandLine(ext)
+        executable 'docker'
+        argumentProviders.add(new CommandLineArgumentProvider() {
+          @Override
+          Iterable<String> asArguments() {
+            return buildDockerArgs(ext)
+          }
+        })
         dependsOn ext.getDependencies()
         logging.captureStandardOutput LogLevel.INFO
         logging.captureStandardError LogLevel.ERROR
@@ -223,41 +230,41 @@ class BeamDockerPlugin implements Plugin<Project> {
     }
   }
 
-  private List<String> buildCommandLine(DockerExtension ext) {
-    List<String> buildCommandLine = ['docker']
+  private List<String> buildDockerArgs(DockerExtension ext) {
+    List<String> buildDockerArgs = []
     if (ext.buildx) {
-      buildCommandLine.addAll(['buildx', 'build'])
+      buildDockerArgs.addAll(['buildx', 'build'])
       if (!ext.platform.isEmpty()) {
-        buildCommandLine.addAll('--platform', String.join(',', ext.platform))
+        buildDockerArgs.addAll('--platform', String.join(',', ext.platform))
       }
       if (ext.load) {
-        buildCommandLine.add '--load'
+        buildDockerArgs.add '--load'
       }
       if (ext.push) {
-        buildCommandLine.add '--push'
+        buildDockerArgs.add '--push'
         if (ext.load) {
           throw new Exception("cannot combine 'push' and 'load' options")
         }
       }
       if (ext.builder != null) {
-        buildCommandLine.addAll('--builder', ext.builder)
+        buildDockerArgs.addAll('--builder', ext.builder)
       }
-      buildCommandLine.addAll('--provenance=false')
+      buildDockerArgs.addAll('--provenance=false')
     } else {
-      buildCommandLine.add 'build'
+      buildDockerArgs.add 'build'
       // TARGETOS and TARGETARCH args not present through `docker build`, add here
       ext.buildArgs.put('TARGETOS', 'linux')
       ext.buildArgs.put('TARGETARCH', ext.project.nativeArchitecture())
     }
     if (ext.noCache) {
-      buildCommandLine.add '--no-cache'
+      buildDockerArgs.add '--no-cache'
     }
     if (ext.getNetwork() != null) {
-      buildCommandLine.addAll('--network', ext.network)
+      buildDockerArgs.addAll('--network', ext.network)
     }
     if (!ext.buildArgs.isEmpty()) {
       for (Map.Entry<String, String> buildArg : ext.buildArgs.entrySet()) {
-        buildCommandLine.addAll('--build-arg', "${buildArg.getKey()}=${buildArg.getValue()}" as String)
+        buildDockerArgs.addAll('--build-arg', "${buildArg.getKey()}=${buildArg.getValue()}" as String)
       }
     }
     if (!ext.labels.isEmpty()) {
@@ -267,11 +274,11 @@ class BeamDockerPlugin implements Plugin<Project> {
           "Label keys must only contain lowercase alphanumberic, `.`, or `-` characters (must match %s).",
           label.getKey(), LABEL_KEY_PATTERN.pattern()))
         }
-        buildCommandLine.addAll('--label', "${label.getKey()}=${label.getValue()}" as String)
+        buildDockerArgs.addAll('--label', "${label.getKey()}=${label.getValue()}" as String)
       }
     }
     if (ext.pull) {
-      buildCommandLine.add '--pull'
+      buildDockerArgs.add '--pull'
     }
     if (!ext.tags.isEmpty() && ext.push) {
       String[] repoParts = (ext.name as String).split(':')
@@ -280,17 +287,17 @@ class BeamDockerPlugin implements Plugin<Project> {
         repo += ':' + repoParts[i]
       }
       for (tag in ext.getTags()) {
-        buildCommandLine.addAll(['-t', repo + ':' + tag])
+        buildDockerArgs.addAll(['-t', repo + ':' + tag])
       }
-      buildCommandLine.add '.'
+      buildDockerArgs.add '.'
     } else {
-      buildCommandLine.addAll(['-t', "${-> ext.name}", '.'])
+      buildDockerArgs.addAll(['-t', "${-> ext.name}", '.'])
     }
     if (ext.target != null && ext.target != "") {
-      buildCommandLine.addAll '--target', ext.target
+      buildDockerArgs.addAll '--target', ext.target
     }
-    logger.debug("${buildCommandLine}" as String)
-    return buildCommandLine
+    logger.debug("Docker args: ${buildDockerArgs}" as String)
+    return buildDockerArgs
   }
 
   private static String computeName(String name, String tag) {
