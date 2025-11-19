@@ -232,9 +232,13 @@ class BeamDockerPlugin implements Plugin<Project> {
 
   private List<String> buildDockerArgs(DockerExtension ext) {
     logger.lifecycle("DEBUG: ext.buildx = ${ext.buildx}")
+    System.out.println("DEBUG: ext.buildx = ${ext.buildx}")
     logger.lifecycle("DEBUG: ext.load = ${ext.load}")
+    System.out.println("DEBUG: ext.load = ${ext.load}")
     logger.lifecycle("DEBUG: ext.push = ${ext.push}")
+    System.out.println("DEBUG: ext.push = ${ext.push}")
     logger.lifecycle("DEBUG: ext.name = ${ext.name}")
+    System.out.println("DEBUG: ext.name = ${ext.name}")
     
     List<String> buildDockerArgs = []
     if (ext.buildx) {
