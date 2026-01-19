@@ -186,7 +186,7 @@ class SubprocessServer(object):
       process, endpoint = self.start_process()
       # The process startup attempts to wait for the service to signal readiness
       wait_secs = .1
-      max_channel_ready_timeout = 30.0
+      max_channel_ready_timeout = 60.0
       start_time = time.time()
       channel_options = [
           ("grpc.max_receive_message_length", -1),
@@ -263,7 +263,7 @@ class SubprocessServer(object):
     # Expansion services typically log "Listening for expansion requests" when ready.
     # We also check if the port is listening as a fallback.
     service_ready = threading.Event()
-    service_ready_timeout = 60.0  # Timeout for waiting for readiness signal
+    service_ready_timeout = 180.0  # Timeout for waiting for readiness signal (increased for dependency downloads)
     service_start_time = time.time()
     last_log_line = None
 
@@ -354,7 +354,7 @@ class SubprocessServer(object):
         # Process is still running but didn't signal readiness.
         # Some services might not log readiness messages, so we'll still try connecting.
         _LOGGER.warning(
-            'Service did not signal readiness within %ds (elapsed: %.1fs, last log: %s). '
+            'Service did not signal readiness within %.0fs (elapsed: %.1fs, last log: %s). '
             'Attempting connection anyway.',
             service_ready_timeout, elapsed, last_log_line)
 
