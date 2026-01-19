@@ -213,9 +213,8 @@ class SubprocessServer(object):
         elapsed_time = time.time() - start_time
         if elapsed_time >= max_channel_ready_timeout:
           error_msg = (
-              f'gRPC channel failed to become ready within {max_channel_ready_timeout}s '
-              f'after service signaled readiness. Elapsed: {elapsed_time:.1f}s. '
-              f'Endpoint: {endpoint}. Process status: '
+              f'gRPC channel failed to become ready within {max_channel_ready_timeout}s. '
+              f'Elapsed: {elapsed_time:.1f}s. Endpoint: {endpoint}. Process status: '
               f'{"running" if process and process.poll() is None else "terminated"}')
           _LOGGER.error(error_msg)
           raise RuntimeError(error_msg)
@@ -262,19 +261,34 @@ class SubprocessServer(object):
 
     # Try to detect when the service signals it's ready to accept connections.
     # Expansion services typically log "Listening for expansion requests" when ready.
+    # We also check if the port is listening as a fallback.
     service_ready = threading.Event()
     service_ready_timeout = 60.0  # Timeout for waiting for readiness signal
     service_start_time = time.time()
+    last_log_line = None
+
+    # Helper function to check if port is listening
+    def check_port_listening(host, port_num):
+      try:
+        test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        test_socket.settimeout(0.5)
+        result = test_socket.connect_ex((host, port_num))
+        test_socket.close()
+        return result == 0
+      except Exception:
+        return False
 
     # Emit the output of this command as info level logging.
     # Also try to detect when the service signals it's ready.
     def log_stdout():
+      nonlocal last_log_line
       line = process.stdout.readline()
       while line:
         # The log obtained from stdout is bytes, decode it into string.
         # Remove newline via rstrip() to not print an empty line.
         decoded_line = line.decode(errors='backslashreplace').rstrip()
         logger.info(decoded_line)
+        last_log_line = decoded_line
 
         # Try to detect service readiness indicators in log output.
         # Expansion service typically logs: "Listening for expansion requests at {port}"
@@ -284,7 +298,7 @@ class SubprocessServer(object):
            ('server started' in decoded_line.lower()) or \
            ('ready to serve' in decoded_line.lower()):
           service_ready.set()
-          _LOGGER.debug("Service signaled readiness: %s", decoded_line)
+          _LOGGER.debug("Service signaled readiness via log: %s", decoded_line)
 
         line = process.stdout.readline()
 
@@ -294,29 +308,55 @@ class SubprocessServer(object):
           if not service_ready.is_set():
             elapsed = time.time() - service_start_time
             _LOGGER.error(
-                "Process exited before signaling readiness (exit code: %s, elapsed: %.1fs)",
-                process.poll(), elapsed)
+                "Process exited before signaling readiness (exit code: %s, elapsed: %.1fs, last log: %s)",
+                process.poll(), elapsed, last_log_line)
           break
 
     t = threading.Thread(target=log_stdout)
     t.daemon = True
     t.start()
 
-    # Wait for the service to signal it's ready, with a timeout to avoid hanging.
+    # Wait for the service to signal it's ready, checking both log messages and port status.
     # This attempts to avoid connecting before the server has started.
-    if not service_ready.wait(timeout=service_ready_timeout):
+    host, port_num = endpoint.split(':')
+    port_num = int(port_num)
+
+    # Poll for readiness: check both log message and port listening status
+    check_interval = 0.5
+    elapsed = 0.0
+    while elapsed < service_ready_timeout:
+      if service_ready.is_set():
+        break
+
+      # Check if port is listening as a fallback
+      if check_port_listening(host, port_num):
+        service_ready.set()
+        _LOGGER.debug("Service signaled readiness via port check: %s", endpoint)
+        break
+
+      # Check if process exited
+      if process.poll() is not None:
+        elapsed = time.time() - service_start_time
+        raise RuntimeError(
+            f'Service process exited before signaling readiness. '
+            f'Exit code: {process.poll()}, elapsed: {elapsed:.1f}s, endpoint: {endpoint}, last log: {last_log_line}')
+
+      time.sleep(check_interval)
+      elapsed = time.time() - service_start_time
+
+    if not service_ready.is_set():
       elapsed = time.time() - service_start_time
       if process.poll() is not None:
         raise RuntimeError(
             f'Service process exited before signaling readiness. '
-            f'Exit code: {process.poll()}, elapsed: {elapsed:.1f}s, endpoint: {endpoint}')
+            f'Exit code: {process.poll()}, elapsed: {elapsed:.1f}s, endpoint: {endpoint}, last log: {last_log_line}')
       else:
         # Process is still running but didn't signal readiness.
         # Some services might not log readiness messages, so we'll still try connecting.
         _LOGGER.warning(
-            'Service did not signal readiness within %ds (elapsed: %.1fs), '
-            'but process is still running. Attempting connection anyway.',
-            service_ready_timeout, elapsed)
+            'Service did not signal readiness within %ds (elapsed: %.1fs, last log: %s). '
+            'Attempting connection anyway.',
+            service_ready_timeout, elapsed, last_log_line)
 
     return process, endpoint
 
