@@ -184,7 +184,10 @@ class SubprocessServer(object):
   def start(self):
     try:
       process, endpoint = self.start_process()
+      # The process startup attempts to wait for the service to signal readiness
       wait_secs = .1
+      max_channel_ready_timeout = 30.0
+      start_time = time.time()
       channel_options = [
           ("grpc.max_receive_message_length", -1),
           ("grpc.max_send_message_length", -1),
@@ -204,18 +207,38 @@ class SubprocessServer(object):
       channel_ready = grpc.channel_ready_future(self._grpc_channel)
       while True:
         if process is not None and process.poll() is not None:
-          _LOGGER.error("Started job service with %s", process.args)
+          _LOGGER.error("Service process exited with %s", process.args)
           raise RuntimeError(
               'Service failed to start up with error %s' % process.poll())
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= max_channel_ready_timeout:
+          error_msg = (
+              f'gRPC channel failed to become ready within {max_channel_ready_timeout}s '
+              f'after service signaled readiness. Elapsed: {elapsed_time:.1f}s. '
+              f'Endpoint: {endpoint}. Process status: '
+              f'{"running" if process and process.poll() is None else "terminated"}')
+          _LOGGER.error(error_msg)
+          raise RuntimeError(error_msg)
         try:
-          channel_ready.result(timeout=wait_secs)
+          # Cap individual wait timeout to check total timeout more frequently
+          individual_timeout = min(wait_secs, max_channel_ready_timeout - elapsed_time)
+          if individual_timeout <= 0:
+            elapsed_time = time.time() - start_time
+            error_msg = (
+                f'gRPC channel failed to become ready within {max_channel_ready_timeout}s. '
+                f'Elapsed: {elapsed_time:.1f}s. Endpoint: {endpoint}')
+            _LOGGER.error(error_msg)
+            raise RuntimeError(error_msg)
+          channel_ready.result(timeout=individual_timeout)
           break
         except (grpc.FutureTimeoutError, grpc.RpcError):
           wait_secs *= 1.2
+          # Cap wait_secs to prevent it from growing too large
+          wait_secs = min(wait_secs, 5.0)
           logging.log(
               logging.WARNING if wait_secs > 1 else logging.DEBUG,
-              'Waiting for grpc channel to be ready at %s.',
-              endpoint)
+              'Waiting for grpc channel to be ready at %s (elapsed: %.1fs).',
+              endpoint, time.time() - start_time)
       return self._stub_class(self._grpc_channel)
     except:  # pylint: disable=bare-except
       _LOGGER.exception("Error bringing up service")
@@ -237,18 +260,64 @@ class SubprocessServer(object):
     process = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
+    # Try to detect when the service signals it's ready to accept connections.
+    # Expansion services typically log "Listening for expansion requests" when ready.
+    service_ready = threading.Event()
+    service_ready_timeout = 60.0  # Timeout for waiting for readiness signal
+    service_start_time = time.time()
+
     # Emit the output of this command as info level logging.
+    # Also try to detect when the service signals it's ready.
     def log_stdout():
       line = process.stdout.readline()
       while line:
         # The log obtained from stdout is bytes, decode it into string.
         # Remove newline via rstrip() to not print an empty line.
-        logger.info(line.decode(errors='backslashreplace').rstrip())
+        decoded_line = line.decode(errors='backslashreplace').rstrip()
+        logger.info(decoded_line)
+
+        # Try to detect service readiness indicators in log output.
+        # Expansion service typically logs: "Listening for expansion requests at {port}"
+        # Other services might log similar messages, so we check for common patterns.
+        if ('Listening for' in decoded_line and 'requests' in decoded_line) or \
+           ('listening on' in decoded_line.lower()) or \
+           ('server started' in decoded_line.lower()) or \
+           ('ready to serve' in decoded_line.lower()):
+          service_ready.set()
+          _LOGGER.debug("Service signaled readiness: %s", decoded_line)
+
         line = process.stdout.readline()
+
+        # Check if process exited while reading
+        if process.poll() is not None:
+          # Process exited - check if we got a ready signal
+          if not service_ready.is_set():
+            elapsed = time.time() - service_start_time
+            _LOGGER.error(
+                "Process exited before signaling readiness (exit code: %s, elapsed: %.1fs)",
+                process.poll(), elapsed)
+          break
 
     t = threading.Thread(target=log_stdout)
     t.daemon = True
     t.start()
+
+    # Wait for the service to signal it's ready, with a timeout to avoid hanging.
+    # This attempts to avoid connecting before the server has started.
+    if not service_ready.wait(timeout=service_ready_timeout):
+      elapsed = time.time() - service_start_time
+      if process.poll() is not None:
+        raise RuntimeError(
+            f'Service process exited before signaling readiness. '
+            f'Exit code: {process.poll()}, elapsed: {elapsed:.1f}s, endpoint: {endpoint}')
+      else:
+        # Process is still running but didn't signal readiness.
+        # Some services might not log readiness messages, so we'll still try connecting.
+        _LOGGER.warning(
+            'Service did not signal readiness within %ds (elapsed: %.1fs), '
+            'but process is still running. Attempting connection anyway.',
+            service_ready_timeout, elapsed)
+
     return process, endpoint
 
   def stop(self):
@@ -439,7 +508,7 @@ class JavaJarServer(SubprocessServer):
   def _download_jar_to_cache(
       cls, download_url, cached_jar_path, user_agent=None):
     """Downloads a jar from the given URL to the specified cache path.
-    
+
     Args:
       download_url (str): The URL to download from.
       cached_jar_path (str): The local path where the jar should be cached.
