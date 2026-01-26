@@ -45,16 +45,16 @@ class DataflowCostBenchmark(LoadTest):
   If using InfluxDB with Basic HTTP authentication enabled, provide the
   following environment options: `INFLUXDB_USER` and `INFLUXDB_USER_PASSWORD`.
 
-  If the hardware configuration for the job includes use of a GPU, please 
+  If the hardware configuration for the job includes use of a GPU, please
   specify the version in use with the Accelerator enumeration. This is used to
   calculate the cost of the job later, as different accelerators have different
   billing rates per hour of use.
   """
 
   WORKER_START_PATTERN = re.compile(
-      r'^All workers have finished the startup processes and '
-      r'began to receive work requests.*$')
-  WORKER_STOP_PATTERN = re.compile(r'^Stopping worker pool.*$')
+      r'All workers have finished the startup processes and '
+      r'began to receive work requests')
+  WORKER_STOP_PATTERN = re.compile(r'Stopping worker pool')
 
   def __init__(
       self,
@@ -84,8 +84,8 @@ class DataflowCostBenchmark(LoadTest):
       self.test()
       if not hasattr(self, 'result'):
         self.result = self.pipeline.run()
-        state = self.result.wait_until_finish(duration=self.timeout_ms)
-        assert state != PipelineState.FAILED
+      state = self.result.wait_until_finish(duration=self.timeout_ms)
+      assert state != PipelineState.FAILED
 
       logging.info(
           'Pipeline complete, sleeping for 4 minutes to allow resource '
@@ -148,26 +148,45 @@ class DataflowCostBenchmark(LoadTest):
   def _get_worker_time_interval(
       self, job_id: str) -> tuple[Optional[str], Optional[str]]:
     """Extracts worker start and stop times from job messages."""
-    messages, _ = self.dataflow_client.list_messages(
-      job_id=job_id,
-      start_time=None,
-      end_time=None,
-      minimum_importance='JOB_MESSAGE_DETAILED')
-
     start_time, end_time = None, None
-    for message in messages:
-      text = message.messageText
-      if text:
-        if self.WORKER_START_PATTERN.match(text):
-          start_time = message.time
-        if self.WORKER_STOP_PATTERN.match(text):
-          end_time = message.time
-
+    page_token = None
+    all_messages = []
+    while True:
+      messages, page_token = self.dataflow_client.list_messages(
+        job_id=job_id,
+        start_time=None,
+        end_time=None,
+        page_token=page_token,
+        minimum_importance='JOB_MESSAGE_DEBUG')
+      for message in messages:
+        text = message.messageText
+        if text:
+          all_messages.append(text)
+          if self.WORKER_START_PATTERN.search(text):
+            start_time = message.time
+            logging.info('Matched WORKER_START_PATTERN: %r', text)
+          if self.WORKER_STOP_PATTERN.search(text):
+            end_time = message.time
+            logging.info('Matched WORKER_STOP_PATTERN: %r', text)
+      if not page_token or (start_time and end_time):
+        break
+    if not start_time or not end_time:
+      logging.warning(
+          'Pattern matching failed. start_time=%s, end_time=%s. '
+          'Dumping all %d job messages for debugging:',
+          start_time, end_time, len(all_messages))
+      for i, msg in enumerate(all_messages):
+        logging.warning('  Message[%d]: %r', i, msg)
     return start_time, end_time
 
   def _get_throughput_metrics(
-      self, project: str, job_id: str, start_time: str,
-      end_time: str) -> dict[str, float]:
+      self,
+      project: str,
+      job_id: str,
+      start_time: str,
+      end_time: str,
+      pcollection_name: Optional[str] = None) -> dict[str, float]:
+    name = pcollection_name if pcollection_name is not None else self.pcollection
     interval = monitoring_v3.TimeInterval(
         start_time=start_time, end_time=end_time)
     aggregation = monitoring_v3.Aggregation(
@@ -178,16 +197,16 @@ class DataflowCostBenchmark(LoadTest):
         "Bytes": monitoring_v3.ListTimeSeriesRequest(
             name=f"projects/{project}",
             filter=f'metric.type='
-            f'"dataflow.googleapis.com/job/estimated_bytes_produced_count" '
+            f'"dataflow.googleapis.com/job/estimated_byte_count" '
             f'AND metric.labels.job_id='
-            f'"{job_id}" AND metric.labels.pcollection="{self.pcollection}"',
+            f'"{job_id}" AND metric.labels.pcollection="{name}"',
             interval=interval,
             aggregation=aggregation),
         "Elements": monitoring_v3.ListTimeSeriesRequest(
             name=f"projects/{project}",
             filter=f'metric.type="dataflow.googleapis.com/job/element_count" '
             f'AND metric.labels.job_id="{job_id}" '
-            f'AND metric.labels.pcollection="{self.pcollection}"',
+            f'AND metric.labels.pcollection="{name}"',
             interval=interval,
             aggregation=aggregation)
     }
@@ -220,9 +239,19 @@ class DataflowCostBenchmark(LoadTest):
       logging.warning('Could not find valid worker start/end times.')
       return {}
 
+    query_start = start_time
+    query_end = end_time
+
     throughput_metrics = self._get_throughput_metrics(
-        project, job_id, start_time, end_time)
+        project, job_id, query_start, query_end)
+    runtime_seconds = self._get_job_runtime(start_time, end_time)
+    if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
+        throughput_metrics.get('AvgThroughputElements', 0) == 0):
+      logging.warning(
+          'No throughput data for PCollection "%s". Check Dataflow job %s '
+          'graph for actual PCollection names (Runner v2 may use different '
+          'naming).', self.pcollection, job_id)
     return {
         **throughput_metrics,
-        "JobRuntimeSeconds": self._get_job_runtime(start_time, end_time),
+        "JobRuntimeSeconds": runtime_seconds,
     }
