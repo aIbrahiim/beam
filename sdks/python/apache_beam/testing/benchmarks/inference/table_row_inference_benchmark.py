@@ -1,0 +1,79 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+"""Benchmark test for table row inference pipeline.
+
+This benchmark measures the performance of RunInference with continuous
+table row inputs, including throughput, latency, and cost metrics.
+"""
+
+import logging
+
+from apache_beam.examples.inference import table_row_inference
+from apache_beam.testing.load_tests.dataflow_cost_benchmark import DataflowCostBenchmark
+
+
+class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
+  """Benchmark for continuous table row inference with RunInference.
+  
+  This benchmark measures:
+  - Mean Inference Batch Size: Average batch size for inference
+  - Mean Inference Batch Latency: Average time per batch inference
+  - Mean Load Model Latency: Time to load the model
+  - Throughput: Elements processed per second
+  - Cost: Estimated cost on Dataflow
+  """
+  def __init__(self):
+    self.metrics_namespace = 'BeamML_TableInference'
+    super().__init__(
+        metrics_namespace=self.metrics_namespace,
+        pcollection='FormatOutput.out0')
+
+  def test(self):
+    """Execute the table row inference pipeline for benchmarking."""
+    extra_opts = {}
+    
+    mode = self.pipeline.get_option('mode') or 'batch'
+    extra_opts['mode'] = mode
+    
+    if mode == 'streaming':
+      extra_opts['input_subscription'] = self.pipeline.get_option(
+          'input_subscription')
+      extra_opts['window_size_sec'] = int(
+          self.pipeline.get_option('window_size_sec') or 60)
+      extra_opts['trigger_interval_sec'] = int(
+          self.pipeline.get_option('trigger_interval_sec') or 30)
+    else:
+      extra_opts['input_file'] = self.pipeline.get_option('input_file')
+    
+    extra_opts['output_table'] = self.pipeline.get_option('output_table')
+    extra_opts['model_path'] = self.pipeline.get_option('model_path')
+    extra_opts['feature_columns'] = self.pipeline.get_option('feature_columns')
+    
+    self.result = table_row_inference.run(
+        self.pipeline.get_full_options_as_args(**extra_opts),
+        test_pipeline=self.pipeline)
+
+
+if __name__ == '__main__':
+  logging.basicConfig(level=logging.INFO)
+  TableRowInferenceBenchmarkTest().run()
+
+
+
+
+
