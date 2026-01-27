@@ -60,7 +60,7 @@ jobs:
     strategy:
       matrix:
         job_name: ["beam_Inference_Python_Benchmarks_Dataflow"]
-        job_phrase: ["Run Inference Benchmarks"]
+        job_phrase: ["Run_Inference_Benchmarks"]
     steps:
       - uses: actions/checkout@v4
       - name: Setup repository
@@ -68,7 +68,7 @@ jobs:
         with:
           comment_phrase: ${{ matrix.job_phrase }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          github_job: ${{ matrix.job_name }} (${{ matrix.job_phrase }})
+          github_job: ${{ matrix.job_name }}
       - name: Setup Python environment
         uses: ./.github/actions/setup-environment-action
         with:
@@ -85,6 +85,8 @@ jobs:
           test-language: python
           argument-file-paths: |
             .github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Table_Row_Inference_Batch.txt
+      - name: Print env vars
+        run: env | grep beam_Inference_Python_Benchmarks_Dataflow
       # The env variables are created and populated in the test-arguments-action as "<github.job>_test_arguments_<argument_file_paths_index>"
       - name: get current time
         run: echo "NOW_UTC=$(date '+%m%d%H%M%S' --utc)" >> $GITHUB_ENV
