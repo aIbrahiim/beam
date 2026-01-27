@@ -60,9 +60,10 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
     else:
       extra_opts['input_file'] = self.pipeline.get_option('input_file')
 
-    extra_opts['output_table'] = self.pipeline.get_option('output_table')
-    extra_opts['model_path'] = self.pipeline.get_option('model_path')
-    extra_opts['feature_columns'] = self.pipeline.get_option('feature_columns')
+    for opt in ['output_table', 'model_path', 'feature_columns']:
+      val = self.pipeline.get_option(opt)
+      if val:
+        extra_opts[opt] = val
 
     self.result = table_row_inference.run(
         self.pipeline.get_full_options_as_args(**extra_opts),
