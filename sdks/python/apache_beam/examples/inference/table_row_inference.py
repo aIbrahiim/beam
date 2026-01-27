@@ -209,15 +209,13 @@ def parse_known_args(argv):
   parser.add_argument(
       '--input_file',
       help='Input file path for batch mode (e.g., gs://bucket/input.jsonl)')
-  parser.add_argument(
+    parser.add_argument(
       '--output_table',
-      required=True,
       help='BigQuery output table (format: PROJECT:DATASET.TABLE)')
-  parser.add_argument(
-      '--model_path', required=True, help='Path to saved model file')
-  parser.add_argument(
+    parser.add_argument(
+      '--model_path', help='Path to saved model file')
+    parser.add_argument(
       '--feature_columns',
-      required=True,
       help='Comma-separated list of feature column names')
   parser.add_argument(
       '--window_size_sec',
