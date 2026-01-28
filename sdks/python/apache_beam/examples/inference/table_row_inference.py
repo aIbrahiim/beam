@@ -59,6 +59,7 @@ import numpy as np
 from apache_beam.ml.inference.base import KeyedModelHandler
 from apache_beam.ml.inference.base import PredictionResult
 from apache_beam.ml.inference.base import RunInference
+from apache_beam.ml.inference.sklearn_inference import ModelFileType
 from apache_beam.ml.inference.sklearn_inference import SklearnModelHandlerNumpy
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import SetupOptions
@@ -80,13 +81,13 @@ class TableRowModelHandler(SklearnModelHandlerNumpy):
       self,
       model_uri: str,
       feature_columns: list[str],
-      model_file_type: int = 0):
+      model_file_type: ModelFileType = ModelFileType.PICKLE):
     """Initialize the TableRowModelHandler.
 
     Args:
       model_uri: Path to the saved model file (local or GCS)
       feature_columns: List of column names to use as model features
-      model_file_type: Type of model file (0=pickle, 1=joblib)
+      model_file_type: Type of model file (PICKLE or JOBLIB)
     """
     super().__init__(model_uri=model_uri, model_file_type=model_file_type)
     self.feature_columns = feature_columns
