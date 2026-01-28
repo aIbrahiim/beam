@@ -250,3 +250,19 @@ looks:
           title: AvgThroughputBytesPerSec by Version
         - id: dKyJy5ZKhkBdSTXRY3wZR6fXzptSs2qm
           title: AvgThroughputElementsPerSec by Version
+  tablerowinference:
+    write:
+      folder: 96
+      cost:
+        - id: 305
+          title: RunTime and EstimatedCost
+      date:
+        - id: 304
+          title: AvgThroughputBytesPerSec by Date
+        - id: 306
+          title: AvgThroughputElementsPerSec by Date
+      version:
+        - id: 307
+          title: AvgThroughputBytesPerSec by Version
+        - id: 308
+          title: AvgThroughputElementsPerSec by Version

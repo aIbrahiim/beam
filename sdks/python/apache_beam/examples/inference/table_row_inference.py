@@ -143,8 +143,10 @@ class FormatTableOutput(beam.DoFn):
     if prediction.model_id:
       output['model_id'] = prediction.model_id
 
-    for field_name in row._fields:
-      output[f'input_{field_name}'] = getattr(row, field_name)
+    # Convert row to dictionary to extract all input fields
+    row_dict = row._asdict()
+    for field_name, value in row_dict.items():
+      output[f'input_{field_name}'] = value
 
     yield output
 

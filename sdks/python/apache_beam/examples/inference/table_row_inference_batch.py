@@ -75,13 +75,13 @@ from apache_beam.options.pipeline_options import SetupOptions
 
 class BatchTableRowModelHandler(SklearnModelHandlerNumpy):
   """ModelHandler for batch processing of table rows.
-  
+
   This handler is optimized for batch inference on structured table data.
   It extracts specified feature columns and runs inference in batches.
   """
   def __init__(self, model_uri: str, feature_columns: list[str]):
     """Initialize the batch model handler.
-    
+
     Args:
       model_uri: Path to the saved model (local or GCS)
       feature_columns: List of column names to use as features
@@ -99,12 +99,12 @@ class BatchTableRowModelHandler(SklearnModelHandlerNumpy):
       inference_args: Optional[dict[str, Any]] = None
   ) -> Iterable[PredictionResult]:
     """Run batch inference on table rows.
-    
+
     Args:
       batch: List of beam.Row objects with table data
       model: Loaded scikit-learn model
       inference_args: Optional inference arguments (unused)
-      
+
     Yields:
       PredictionResult for each input row
     """
@@ -112,11 +112,11 @@ class BatchTableRowModelHandler(SklearnModelHandlerNumpy):
     for row in batch:
       features = [getattr(row, col, 0.0) for col in self.feature_columns]
       features_list.append(features)
-    
+
     features_array = np.array(features_list, dtype=np.float32)
-    
+
     predictions = model.predict(features_array)
-    
+
     for row, prediction in zip(batch, predictions):
       yield PredictionResult(
           example=row, inference=float(prediction), model_id=self._model_uri)
@@ -126,7 +126,7 @@ class FormatBatchOutput(beam.DoFn):
   """Format inference results for batch output."""
   def __init__(self, include_metadata: bool = True):
     """Initialize formatter.
-    
+
     Args:
       include_metadata: Whether to include model_id in output
     """
@@ -135,64 +135,65 @@ class FormatBatchOutput(beam.DoFn):
   def process(
       self, element: tuple[str, PredictionResult]) -> Iterable[dict[str, Any]]:
     """Format a keyed inference result.
-    
+
     Args:
       element: Tuple of (row_key, PredictionResult)
-      
+
     Yields:
       Dictionary with formatted output
     """
     key, prediction = element
     row = prediction.example
-    
+
     output = {'id': key, 'prediction': prediction.inference}
-    
+
     if self.include_metadata and prediction.model_id:
       output['model_id'] = prediction.model_id
-    
-    for field_name in row._fields:
-      output[field_name] = getattr(row, field_name)
-    
+
+    row_dict = row._asdict()
+    for field_name, value in row_dict.items():
+      output[field_name] = value
+
     yield output
 
 
 def parse_jsonl_line(line: str, schema_fields: list[str]) -> tuple[str, beam.Row]:
   """Parse a JSONL line to (key, beam.Row) format.
-  
+
   Args:
     line: JSON string
     schema_fields: Expected field names
-    
+
   Returns:
     Tuple of (row_id, beam.Row)
   """
   data = json.loads(line)
-  
+
   row_id = data.get('id', str(hash(line)))
-  
+
   row_fields = {}
   for field in schema_fields:
     if field in data:
       value = data[field]
       row_fields[field] = float(value) if isinstance(value, (int, float)) else value
-  
+
   return row_id, beam.Row(**row_fields)
 
 
 def build_bigquery_schema(feature_columns: list[str]) -> str:
   """Build BigQuery schema for output table.
-  
+
   Args:
     feature_columns: List of feature column names
-    
+
   Returns:
     BigQuery schema string
   """
   schema_fields = ['id:STRING', 'prediction:FLOAT', 'model_id:STRING']
-  
+
   for col in feature_columns:
     schema_fields.append(f'{col}:FLOAT')
-  
+
   return ','.join(schema_fields)
 
 
@@ -204,7 +205,7 @@ def run_batch_inference(
     output_file: Optional[str] = None,
     pipeline_options: Optional[PipelineOptions] = None) -> beam.Pipeline:
   """Run batch inference pipeline.
-  
+
   Args:
     input_file: Path to input file (JSONL format)
     model_path: Path to saved model
@@ -212,38 +213,38 @@ def run_batch_inference(
     output_table: Optional BigQuery table (PROJECT:DATASET.TABLE)
     output_file: Optional output file path
     pipeline_options: Beam pipeline options
-    
+
   Returns:
     Executed pipeline
   """
   if not output_table and not output_file:
     raise ValueError('Must specify either output_table or output_file')
-  
+
   pipeline_options = pipeline_options or PipelineOptions()
-  
+
   model_handler = BatchTableRowModelHandler(
       model_uri=model_path, feature_columns=feature_columns)
-  
+
   logging.info(f'Starting batch inference pipeline')
   logging.info(f'  Input: {input_file}')
   logging.info(f'  Model: {model_path}')
   logging.info(f'  Features: {feature_columns}')
   logging.info(
       f'  Output: {output_table if output_table else output_file}')
-  
+
   with beam.Pipeline(options=pipeline_options) as pipeline:
-    
+
     input_data = (
         pipeline
         | 'ReadInputFile' >> beam.io.ReadFromText(input_file)
         | 'ParseToRows' >> beam.Map(
             lambda line: parse_jsonl_line(line, feature_columns)))
-    
+
     predictions = (
         input_data
         | 'RunInference' >> RunInference(KeyedModelHandler(model_handler))
         | 'FormatOutput' >> beam.ParDo(FormatBatchOutput()))
-    
+
     if output_table:
       schema = build_bigquery_schema(feature_columns)
       _ = (
@@ -255,14 +256,14 @@ def run_batch_inference(
               create_disposition=beam.io.BigQueryDisposition.
               CREATE_IF_NEEDED,
               method=beam.io.WriteToBigQuery.Method.FILE_LOADS))
-    
+
     if output_file:
       _ = (
           predictions
           | 'FormatJSON' >> beam.Map(json.dumps)
           | 'WriteToFile' >> beam.io.WriteToText(
               output_file, file_name_suffix='.jsonl', shard_name_template=''))
-  
+
   logging.info('Batch inference pipeline completed successfully')
   return pipeline
 
@@ -273,41 +274,41 @@ def main(argv=None):
       description='Batch inference on table rows using RunInference',
       formatter_class=argparse.RawDescriptionHelpFormatter,
       epilog=__doc__)
-  
+
   parser.add_argument(
       '--input_file',
       required=True,
       help='Input file path (JSONL format). Can be local or GCS path.')
-  
+
   parser.add_argument(
       '--model_path',
       required=True,
       help='Path to saved model file. Can be local or GCS path.')
-  
+
   parser.add_argument(
       '--feature_columns',
       required=True,
       help='Comma-separated list of feature column names to extract from input rows.'
   )
-  
+
   parser.add_argument(
       '--output_table',
       help='BigQuery output table in format PROJECT:DATASET.TABLE')
-  
+
   parser.add_argument(
       '--output_file',
       help='Output file path (JSONL format). Alternative to output_table.')
-  
+
   known_args, pipeline_args = parser.parse_known_args(argv)
-  
+
   if not known_args.output_table and not known_args.output_file:
     parser.error('Must specify either --output_table or --output_file')
-  
+
   feature_columns = [col.strip() for col in known_args.feature_columns.split(',')]
-  
+
   pipeline_options = PipelineOptions(pipeline_args)
   pipeline_options.view_as(SetupOptions).save_main_session = True
-  
+
   run_batch_inference(
       input_file=known_args.input_file,
       model_path=known_args.model_path,
