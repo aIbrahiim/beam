@@ -203,4 +203,4 @@ jobs:
             -Prunner=DataflowRunner \
             -PpythonVersion=3.10 \
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/table_row_inference_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_9 }} --job_name=benchmark-tests-table-row-inference-batch-${{env.NOW_UTC}}"
+            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_9 }} --input_options='{}' --job_name=benchmark-tests-table-row-inference-batch-${{env.NOW_UTC}}"
