@@ -80,93 +80,16 @@ jobs:
         run: ./gradlew :sdks:python:sdist -PpythonVersion=3.10
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker us-docker.pkg.dev
-      - name: get current time
-        run: echo "NOW_UTC=$(date '+%m%d%H%M%S' --utc)" >> $GITHUB_ENV
       - name: Prepare test arguments
         uses: ./.github/actions/test-arguments-action
         with:
           test-type: load
           test-language: python
           argument-file-paths: |
-            ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Pytorch_Imagenet_Classification_Resnet_152.txt
-            ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Pytorch_Imagenet_Classification_Resnet_152_Tesla_T4_GPU.txt
-            ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Pytorch_Language_Modeling_Bert_Base_Uncased.txt
-            ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Pytorch_Language_Modeling_Bert_Large_Uncased.txt
-            ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Pytorch_Sentiment_Batch_DistilBert_Base_Uncased.txt
-            ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Pytorch_Sentiment_Streaming_DistilBert_Base_Uncased.txt
-            ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Pytorch_Vision_Classification_Resnet_101.txt
             ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Table_Row_Inference_Batch.txt
-            ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_VLLM_Gemma_Batch.txt
-      - name: run Pytorch Imagenet Classification Resnet 152
-        uses: ./.github/actions/gradle-command-self-hosted-action
-        with:
-          gradle-command: :sdks:python:apache_beam:testing:load_tests:run
-          arguments: |
-            -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_imagenet_resnet152 \
-            -Prunner=DataflowRunner \
-            -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/pytorch_imagenet_resnet152_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_1 }} --job_name=benchmark-tests-pytorch-imagenet-resnet152-${{env.NOW_UTC}}"
-      - name: run Pytorch Imagenet Classification Resnet 152 with Tesla T4 GPU
-        uses: ./.github/actions/gradle-command-self-hosted-action
-        with:
-          gradle-command: :sdks:python:apache_beam:testing:load_tests:run
-          arguments: |
-            -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_imagenet_resnet152 \
-            -Prunner=DataflowRunner \
-            -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/pytorch_imagenet_resnet152_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_2 }} --job_name=benchmark-tests-pytorch-imagenet-resnet152-gpu-${{env.NOW_UTC}}"
-      - name: run Pytorch Language Modeling Bert Base Uncased
-        uses: ./.github/actions/gradle-command-self-hosted-action
-        with:
-          gradle-command: :sdks:python:apache_beam:testing:load_tests:run
-          arguments: |
-            -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_language_modeling_bert \
-            -Prunner=DataflowRunner \
-            -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/pytorch_language_modeling_bert_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_3 }} --job_name=benchmark-tests-pytorch-language-modeling-bert-base-${{env.NOW_UTC}}"
-      - name: run Pytorch Language Modeling Bert Large Uncased
-        uses: ./.github/actions/gradle-command-self-hosted-action
-        with:
-          gradle-command: :sdks:python:apache_beam:testing:load_tests:run
-          arguments: |
-            -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_language_modeling_bert \
-            -Prunner=DataflowRunner \
-            -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/pytorch_language_modeling_bert_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_4 }} --job_name=benchmark-tests-pytorch-language-modeling-bert-large-${{env.NOW_UTC}}"
-      - name: run Pytorch Sentiment Batch DistilBert Base Uncased
-        uses: ./.github/actions/gradle-command-self-hosted-action
-        with:
-          gradle-command: :sdks:python:apache_beam:testing:load_tests:run
-          arguments: |
-            -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_sentiment_distilbert \
-            -Prunner=DataflowRunner \
-            -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/pytorch_sentiment_distilbert_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_5 }} --job_name=benchmark-tests-pytorch-sentiment-distilbert-batch-${{env.NOW_UTC}}"
-      - name: run Pytorch Sentiment Streaming DistilBert Base Uncased
-        uses: ./.github/actions/gradle-command-self-hosted-action
-        with:
-          gradle-command: :sdks:python:apache_beam:testing:load_tests:run
-          arguments: |
-            -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_sentiment_distilbert \
-            -Prunner=DataflowRunner \
-            -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/pytorch_sentiment_distilbert_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_6 }} --job_name=benchmark-tests-pytorch-sentiment-distilbert-streaming-${{env.NOW_UTC}}"
-      - name: run Pytorch Vision Classification Resnet 101
-        uses: ./.github/actions/gradle-command-self-hosted-action
-        with:
-          gradle-command: :sdks:python:apache_beam:testing:load_tests:run
-          arguments: |
-            -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_vision_classification_resnet101 \
-            -Prunner=DataflowRunner \
-            -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/pytorch_vision_classification_resnet101_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_7 }} --job_name=benchmark-tests-pytorch-vision-resnet101-${{env.NOW_UTC}}"
+      # The env variables are created and populated in the test-arguments-action as "<github.job>_test_arguments_<argument_file_paths_index>"
+      - name: get current time
+        run: echo "NOW_UTC=$(date '+%m%d%H%M%S' --utc)" >> $GITHUB_ENV
       - name: run Table Row Inference Sklearn Batch
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
@@ -177,14 +100,4 @@ jobs:
             -Prunner=DataflowRunner \
             -PpythonVersion=3.10 \
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/table_row_inference_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_8 }} --job_name=benchmark-tests-table-row-inference-batch-${{env.NOW_UTC}}"
-      - name: run VLLM Gemma Batch
-        uses: ./.github/actions/gradle-command-self-hosted-action
-        with:
-          gradle-command: :sdks:python:apache_beam:testing:load_tests:run
-          arguments: |
-            -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.vllm_gemma \
-            -Prunner=DataflowRunner \
-            -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/vllm_gemma_requirements.txt \
-            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_9 }} --job_name=benchmark-tests-vllm-gemma-batch-${{env.NOW_UTC}}"
+            -PloadTest.args="${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_1 }} --job_name=benchmark-tests-table-row-inference-batch-${{env.NOW_UTC}}"
