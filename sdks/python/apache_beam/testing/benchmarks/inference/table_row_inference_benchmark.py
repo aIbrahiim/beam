@@ -45,35 +45,28 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
 
   def test(self):
     """Execute the table row inference pipeline for benchmarking."""
-    # The load test framework passes arguments through the pipeline options.
-    # We extract them here to pass to the actual pipeline implementation.
-    
-    # Use getattr to safely get options that might not be registered in the parser
-    options = self.pipeline.get_pipeline_options().get_all_options()
-    
-    mode = options.get('mode') or 'batch'
-    extra_opts = {'mode': mode}
+    extra_opts = {}
+
+    mode = self.pipeline.get_option('mode') or 'batch'
+    extra_opts['mode'] = mode
 
     if mode == 'streaming':
-      extra_opts['input_subscription'] = options.get('input_subscription')
-      extra_opts['window_size_sec'] = int(options.get('window_size_sec') or 60)
-      extra_opts['trigger_interval_sec'] = int(options.get('trigger_interval_sec') or 30)
+      extra_opts['input_subscription'] = self.pipeline.get_option(
+          'input_subscription')
+      extra_opts['window_size_sec'] = int(
+          self.pipeline.get_option('window_size_sec') or 60)
+      extra_opts['trigger_interval_sec'] = int(
+          self.pipeline.get_option('trigger_interval_sec') or 30)
     else:
-      extra_opts['input_file'] = options.get('input_file')
+      extra_opts['input_file'] = self.pipeline.get_option('input_file')
 
     for opt in ['output_table', 'model_path', 'feature_columns']:
-      val = options.get(opt)
+      val = self.pipeline.get_option(opt)
       if val:
         extra_opts[opt] = val
 
-    # Convert the dictionary of options back into a list of strings for the run() function
-    argv = []
-    for k, v in extra_opts.items():
-      if v is not None:
-        argv.extend([f'--{k}', str(v)])
-
     self.result = table_row_inference.run(
-        argv,
+        self.pipeline.get_full_options_as_args(**extra_opts),
         test_pipeline=self.pipeline)
 
 
