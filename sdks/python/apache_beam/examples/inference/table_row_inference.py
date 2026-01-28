@@ -126,6 +126,9 @@ class FormatTableOutput(beam.DoFn):
   Takes PredictionResult objects from KeyedModelHandler and formats them
   into dictionaries suitable for writing to BigQuery or other table outputs.
   """
+  def __init__(self, feature_columns: list[str]):
+    self.feature_columns = feature_columns
+
   def process(
       self, element: tuple[str, PredictionResult]) -> Iterable[dict[str, Any]]:
     """Process a keyed inference result into table output format.
@@ -143,8 +146,8 @@ class FormatTableOutput(beam.DoFn):
     if prediction.model_id:
       output['model_id'] = prediction.model_id
 
-    for field_name, value in row._asdict().items():
-      output[f'input_{field_name}'] = value
+    for field_name in self.feature_columns:
+      output[f'input_{field_name}'] = getattr(row, field_name)
 
     yield output
 
@@ -292,7 +295,7 @@ def run(
   _ = (
       input_data
       | 'RunInference' >> RunInference(KeyedModelHandler(model_handler))
-      | 'FormatOutput' >> beam.ParDo(FormatTableOutput())
+      | 'FormatOutput' >> beam.ParDo(FormatTableOutput(feature_columns))
       | 'WriteToBigQuery' >> beam.io.WriteToBigQuery(
           known_args.output_table,
           schema=output_schema,

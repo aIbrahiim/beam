@@ -124,12 +124,14 @@ class BatchTableRowModelHandler(SklearnModelHandlerNumpy):
 
 class FormatBatchOutput(beam.DoFn):
   """Format inference results for batch output."""
-  def __init__(self, include_metadata: bool = True):
+  def __init__(self, feature_columns: list[str], include_metadata: bool = True):
     """Initialize formatter.
 
     Args:
+      feature_columns: List of feature column names to include
       include_metadata: Whether to include model_id in output
     """
+    self.feature_columns = feature_columns
     self.include_metadata = include_metadata
 
   def process(
@@ -150,8 +152,8 @@ class FormatBatchOutput(beam.DoFn):
     if self.include_metadata and prediction.model_id:
       output['model_id'] = prediction.model_id
 
-    for field_name, value in row._asdict().items():
-      output[field_name] = value
+    for field_name in self.feature_columns:
+      output[field_name] = getattr(row, field_name)
 
     yield output
 
@@ -242,7 +244,7 @@ def run_batch_inference(
     predictions = (
         input_data
         | 'RunInference' >> RunInference(KeyedModelHandler(model_handler))
-        | 'FormatOutput' >> beam.ParDo(FormatBatchOutput()))
+        | 'FormatOutput' >> beam.ParDo(FormatBatchOutput(feature_columns)))
 
     if output_table:
       schema = build_bigquery_schema(feature_columns)
