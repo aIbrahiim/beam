@@ -150,8 +150,7 @@ class FormatBatchOutput(beam.DoFn):
     if self.include_metadata and prediction.model_id:
       output['model_id'] = prediction.model_id
 
-    row_dict = row._asdict()
-    for field_name, value in row_dict.items():
+    for field_name, value in row._asdict().items():
       output[field_name] = value
 
     yield output
