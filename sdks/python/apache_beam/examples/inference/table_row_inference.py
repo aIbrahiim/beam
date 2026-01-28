@@ -117,7 +117,7 @@ class TableRowModelHandler(SklearnModelHandlerNumpy):
 
     for row, prediction in zip(batch, predictions):
       yield PredictionResult(
-          example=row, inference=float(prediction), model_id=self.model_id)
+          example=row, inference=float(prediction), model_id=self._model_uri)
 
 
 class FormatTableOutput(beam.DoFn):
