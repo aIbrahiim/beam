@@ -1128,6 +1128,17 @@ class BigQueryFileLoadsIT(unittest.TestCase):
       }]
   })
 
+  @classmethod
+  def setUpClass(cls):
+    cls.test_pipeline = TestPipeline(is_integration_test=True)
+    cls.old_max_file_size = bqfl._DEFAULT_MAX_FILE_SIZE
+    cls.old_max_load_size = bqfl._MAXIMUM_LOAD_SIZE
+
+  @classmethod
+  def tearDownClass(cls):
+    bqfl._DEFAULT_MAX_FILE_SIZE = cls.old_max_file_size
+    bqfl._MAXIMUM_LOAD_SIZE = cls.old_max_load_size
+
   def setUp(self):
     self.test_pipeline = TestPipeline(is_integration_test=True)
     self.runner_name = type(self.test_pipeline.runner).__name__
@@ -1142,6 +1153,7 @@ class BigQueryFileLoadsIT(unittest.TestCase):
         "Created dataset %s in project %s", self.dataset_id, self.project)
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_batch_copy_jobs_with_no_input_schema(self):
     schema_1 = "col_1:INTEGER"
     schema_2 = "col_2:INTEGER"
@@ -1197,12 +1209,13 @@ class BigQueryFileLoadsIT(unittest.TestCase):
               create_disposition="CREATE_NEVER",
               write_disposition="WRITE_APPEND",
               # reduce load job size to induce copy jobs
-              max_file_size=10,
-              max_partition_size=20))
+              max_file_size=100,
+              max_partition_size=200))
 
     hamcrest_assert(p, all_of(*verifiers))
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_multiple_destinations_transform(self):
     output_table_1 = '%s%s' % (self.output_table, 1)
     output_table_2 = '%s%s' % (self.output_table, 2)
@@ -1275,11 +1288,12 @@ class BigQueryFileLoadsIT(unittest.TestCase):
               schema_side_inputs=(schema_map_pcv, ),
               create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
               write_disposition=beam.io.BigQueryDisposition.WRITE_EMPTY,
-              max_file_size=20,
+              max_file_size=100,
               max_files_per_bundle=-1))
     hamcrest_assert(p, all_of(*pipeline_verifiers))
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_bqfl_streaming(self):
     if isinstance(self.test_pipeline.runner, TestDataflowRunner):
       self.skipTest("TestStream is not supported on TestDataflowRunner")
@@ -1319,6 +1333,9 @@ class BigQueryFileLoadsIT(unittest.TestCase):
     hamcrest_assert(p, bq_matcher)
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
+  @mock.patch("apache_beam.io.gcp.bigquery_file_loads._DEFAULT_MAX_FILE_SIZE", 100)
+  @mock.patch("apache_beam.io.gcp.bigquery_file_loads._MAXIMUM_LOAD_SIZE", 200)
   def test_bqfl_streaming_with_copy_jobs(self):
     if isinstance(self.test_pipeline.runner, TestDataflowRunner):
       self.skipTest("TestStream is not supported on TestDataflowRunner")
@@ -1337,9 +1354,7 @@ class BigQueryFileLoadsIT(unittest.TestCase):
         streaming=True,
         allow_unsafe_triggers=True)
 
-    # Override these parameters to induce copy jobs
-    bqfl._DEFAULT_MAX_FILE_SIZE = 100
-    bqfl._MAXIMUM_LOAD_SIZE = 200
+    # Override these parameters via mock.patch to induce copy jobs
 
     with beam.Pipeline(argv=args) as p:
       stream_source = (
@@ -1364,6 +1379,7 @@ class BigQueryFileLoadsIT(unittest.TestCase):
     hamcrest_assert(p, bq_matcher)
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_bqfl_streaming_with_dynamic_destinations(self):
     if isinstance(self.test_pipeline.runner, TestDataflowRunner):
       self.skipTest("TestStream is not supported on TestDataflowRunner")

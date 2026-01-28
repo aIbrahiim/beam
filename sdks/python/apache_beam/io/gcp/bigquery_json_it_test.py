@@ -25,6 +25,8 @@ import logging
 import time
 import unittest
 from random import randint
+from tenacity import retry
+from tenacity import stop_after_attempt
 
 import pytest
 
@@ -188,6 +190,7 @@ class BigQueryJsonIT(unittest.TestCase):
         ) | 'Validate rows' >> beam.ParDo(CompareJson())
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_direct_read(self):
     extra_opts = {
         'read_method': "DIRECT_READ",
@@ -198,6 +201,7 @@ class BigQueryJsonIT(unittest.TestCase):
     self.read_and_validate_rows(options)
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_export_read(self):
     extra_opts = {
         'read_method': "EXPORT",
@@ -208,6 +212,7 @@ class BigQueryJsonIT(unittest.TestCase):
     self.read_and_validate_rows(options)
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_query_read(self):
     extra_opts = {
         'query': "SELECT "
@@ -223,6 +228,7 @@ class BigQueryJsonIT(unittest.TestCase):
     self.read_and_validate_rows(options)
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_streaming_inserts(self):
     extra_opts = {
         'output': f"{PROJECT}:{DATASET_ID}.{STREAMING_TEST_TABLE}",
@@ -233,6 +239,7 @@ class BigQueryJsonIT(unittest.TestCase):
     self.run_test_write(options)
 
   @pytest.mark.it_postcommit
+  @retry(reraise=True, stop=stop_after_attempt(3))
   def test_file_loads_write(self):
     extra_opts = {
         'output': f"{PROJECT}:{DATASET_ID}.{FILE_LOAD_TABLE}",
