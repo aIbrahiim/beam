@@ -29,7 +29,7 @@ from apache_beam.testing.load_tests.dataflow_cost_benchmark import DataflowCostB
 
 class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
   """Benchmark for continuous table row inference with RunInference.
-  
+
   This benchmark measures:
   - Mean Inference Batch Size: Average batch size for inference
   - Mean Inference Batch Latency: Average time per batch inference
@@ -46,10 +46,10 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
   def test(self):
     """Execute the table row inference pipeline for benchmarking."""
     extra_opts = {}
-    
+
     mode = self.pipeline.get_option('mode') or 'batch'
     extra_opts['mode'] = mode
-    
+
     if mode == 'streaming':
       extra_opts['input_subscription'] = self.pipeline.get_option(
           'input_subscription')
@@ -59,11 +59,12 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
           self.pipeline.get_option('trigger_interval_sec') or 30)
     else:
       extra_opts['input_file'] = self.pipeline.get_option('input_file')
-    
-    extra_opts['output_table'] = self.pipeline.get_option('output_table')
-    extra_opts['model_path'] = self.pipeline.get_option('model_path')
-    extra_opts['feature_columns'] = self.pipeline.get_option('feature_columns')
-    
+
+    for opt in ['output_table', 'model_path', 'feature_columns']:
+      val = self.pipeline.get_option(opt)
+      if val:
+        extra_opts[opt] = val
+
     self.result = table_row_inference.run(
         self.pipeline.get_full_options_as_args(**extra_opts),
         test_pipeline=self.pipeline)
@@ -72,8 +73,3 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
   TableRowInferenceBenchmarkTest().run()
-
-
-
-
-

@@ -252,17 +252,17 @@ looks:
           title: AvgThroughputElementsPerSec by Version
   tablerowinference:
     write:
-      folder: #TODO
+      folder: 96
       cost:
-        - id: #TODO
+        - id: 305
           title: RunTime and EstimatedCost
       date:
-        - id: #TODO
+        - id: 304
           title: AvgThroughputBytesPerSec by Date
-        - id: #TODO
+        - id: 306
           title: AvgThroughputElementsPerSec by Date
       version:
-        - id: #TODO
+        - id: 307
           title: AvgThroughputBytesPerSec by Version
-        - id: #TODO
+        - id: 308
           title: AvgThroughputElementsPerSec by Version
