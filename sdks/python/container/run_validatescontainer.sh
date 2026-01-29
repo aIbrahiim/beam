@@ -78,6 +78,11 @@ PREBUILD_SDK_CONTAINER_REGISTRY_PATH=us.gcr.io/$PROJECT/$USER/prebuild_python${P
 echo "Using container $CONTAINER"
 echo "Using CPU architecture $ARCH"
 
+echo ">>> Configuring Docker authentication for GCR"
+gcloud --quiet auth configure-docker us.gcr.io
+gcloud --quiet auth configure-docker gcr.io
+gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us.gcr.io
+
 if [[ "$ARCH" == "x86" ]]; then
   # Verify docker image has been built.
   docker images | grep "apache/$IMAGE_NAME" | grep "$SDK_VERSION"
@@ -86,7 +91,7 @@ if [[ "$ARCH" == "x86" ]]; then
   docker tag "apache/$IMAGE_NAME:$SDK_VERSION" "$CONTAINER:$TAG"
 
   # Push the container
-  gcloud docker -- push $CONTAINER:$TAG
+  docker push $CONTAINER:$TAG
 elif [[ "$ARCH" == "ARM" ]]; then
   # Reset the multi-arch Python SDK container image tag.
   TAG=$MULTIARCH_TAG
@@ -133,11 +138,6 @@ echo ">>> Successfully built and push container $CONTAINER"
 
 cd sdks/python
 SDK_LOCATION=$2
-
-echo ">>> Configuring Docker authentication for GCR"
-gcloud --quiet auth configure-docker us.gcr.io
-gcloud --quiet auth configure-docker gcr.io
-gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us.gcr.io
 
 echo ">>> RUNNING DATAFLOW RUNNER VALIDATESCONTAINER TEST"
 pytest -o log_cli=True -o log_level=Info -o junit_suite_name=$IMAGE_NAME \

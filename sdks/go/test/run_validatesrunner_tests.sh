@@ -416,8 +416,13 @@ if [[ "$RUNNER" == "dataflow" ]]; then
       # Verify it exists
       docker images | grep $JAVA_TAG
 
+      # Configure Docker auth for GCR
+      gcloud --quiet auth configure-docker us.gcr.io
+      gcloud --quiet auth configure-docker gcr.io
+      gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us.gcr.io
+
       # Push the container
-      gcloud docker -- push $JAVA_CONTAINER:$JAVA_TAG
+      docker push $JAVA_CONTAINER:$JAVA_TAG
 
       SDK_OVERRIDES=".*java.*,$JAVA_CONTAINER:$JAVA_TAG"
     fi
