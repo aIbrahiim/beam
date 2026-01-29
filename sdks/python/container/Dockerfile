@@ -13,7 +13,7 @@
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
-# limitations under the License.
+#  limitations under the License.
 ###############################################################################
 
 ARG py_version
@@ -84,11 +84,14 @@ RUN  \
     rm -rf /root/.cache/pip && \
 
     # Update ensurepip to use most recent versions of setuptools and pip. This avoids some vulnerabilities which won't be fixed on older versions of python.
-    pip install upgrade_ensurepip; \
-    python3 -m upgrade_ensurepip; \
-    find /usr/local/lib/python${py_version}/ensurepip/_bundled/setuptools-* -type f ! -name $(basename $(ls -v /usr/local/lib/python${py_version}/ensurepip/_bundled/setuptools-*-py3-none-any.whl | tail -n 1)) -delete; \
-    find /usr/local/lib/python${py_version}/ensurepip/_bundled/pip-* -type f ! -name $(basename $(ls -v /usr/local/lib/python${py_version}/ensurepip/_bundled/pip-*-py3-none-any.whl | tail -n 1)) -delete; \
-    pip uninstall upgrade_ensurepip -y; \
+    # We only run upgrade_ensurepip if setuptools is bundled (it was removed in newer Python versions).
+    if ls /usr/local/lib/python${py_version}/ensurepip/_bundled/setuptools-* > /dev/null 2>&1; then \
+      pip install upgrade_ensurepip; \
+      python3 -m upgrade_ensurepip || echo "upgrade_ensurepip failed, skipping"; \
+      find /usr/local/lib/python${py_version}/ensurepip/_bundled/setuptools-* -type f ! -name $(basename $(ls -v /usr/local/lib/python${py_version}/ensurepip/_bundled/setuptools-*-py3-none-any.whl | tail -n 1)) -delete; \
+      find /usr/local/lib/python${py_version}/ensurepip/_bundled/pip-* -type f ! -name $(basename $(ls -v /usr/local/lib/python${py_version}/ensurepip/_bundled/pip-*-py3-none-any.whl | tail -n 1)) -delete; \
+      pip uninstall upgrade_ensurepip -y; \
+    fi; \
     python3 -m ensurepip;
 
 ENTRYPOINT ["/opt/apache/beam/boot"]
