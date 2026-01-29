@@ -301,14 +301,9 @@ def run(
       | 'WriteToBigQuery' >> beam.io.WriteToBigQuery(
           known_args.output_table,
           schema=output_schema,
-          write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
+          write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
           create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-          method=write_method,
-          additional_bq_parameters={
-              'schemaUpdateOptions': [
-                  'ALLOW_FIELD_ADDITION', 'ALLOW_FIELD_RELAXATION'
-              ]
-          }))
+          method=write_method))
 
   result = pipeline.run()
 

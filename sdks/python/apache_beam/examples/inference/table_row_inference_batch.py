@@ -255,14 +255,9 @@ def run_batch_inference(
           | 'WriteToBigQuery' >> beam.io.WriteToBigQuery(
               output_table,
               schema=schema,
-              write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
+              write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
               create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
-              method=beam.io.WriteToBigQuery.Method.FILE_LOADS,
-              additional_bq_parameters={
-                  'schemaUpdateOptions': [
-                      'ALLOW_FIELD_ADDITION', 'ALLOW_FIELD_RELAXATION'
-                  ]
-              }))
+              method=beam.io.WriteToBigQuery.Method.FILE_LOADS))
 
     if output_file:
       _ = (
@@ -328,8 +323,3 @@ def main(argv=None):
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
   main()
-
-
-
-
-
