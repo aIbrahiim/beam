@@ -51,10 +51,8 @@ class DataflowCostBenchmark(LoadTest):
   billing rates per hour of use.
   """
 
-  WORKER_START_PATTERN = re.compile(
-      r'All workers have finished the startup processes and '
-      r'began to receive work requests')
-  WORKER_STOP_PATTERN = re.compile(r'Stopping worker pool')
+  WORKER_START_PATTERN = re.compile(r'All workers have finished the startup processes')
+  WORKER_STOP_PATTERN = re.compile(r'Stopping worker pool|Worker pool stopped')
 
   def __init__(
       self,
@@ -156,7 +154,7 @@ class DataflowCostBenchmark(LoadTest):
         start_time=None,
         end_time=None,
         page_token=page_token,
-        minimum_importance='JOB_MESSAGE_DETAILED')
+        minimum_importance='JOB_MESSAGE_DEBUG')
       for message in messages:
         text = message.messageText
         if text:
@@ -181,7 +179,7 @@ class DataflowCostBenchmark(LoadTest):
         "Bytes": monitoring_v3.ListTimeSeriesRequest(
             name=f"projects/{project}",
             filter=f'metric.type='
-            f'"dataflow.googleapis.com/job/estimated_bytes_produced_count" '
+            f'"dataflow.googleapis.com/job/estimated_byte_count" '
             f'AND metric.labels.job_id='
             f'"{job_id}" AND metric.labels.pcollection="{self.pcollection}"',
             interval=interval,
