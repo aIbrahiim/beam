@@ -52,9 +52,9 @@ class DataflowCostBenchmark(LoadTest):
   """
 
   WORKER_START_PATTERN = re.compile(
-      r'^All workers have finished the startup processes and '
-      r'began to receive work requests.*$')
-  WORKER_STOP_PATTERN = re.compile(r'^Stopping worker pool.*$')
+      r'All workers have finished the startup processes and '
+      r'began to receive work requests')
+  WORKER_STOP_PATTERN = re.compile(r'Stopping worker pool')
 
   def __init__(
       self,
@@ -158,9 +158,9 @@ class DataflowCostBenchmark(LoadTest):
     for message in messages:
       text = message.messageText
       if text:
-        if self.WORKER_START_PATTERN.match(text):
+        if self.WORKER_START_PATTERN.search(text):
           start_time = message.time
-        if self.WORKER_STOP_PATTERN.match(text):
+        if self.WORKER_STOP_PATTERN.search(text):
           end_time = message.time
 
     return start_time, end_time
