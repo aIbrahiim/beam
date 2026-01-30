@@ -172,7 +172,7 @@ class DataflowCostBenchmark(LoadTest):
         start_time=start_time, end_time=end_time)
     aggregation = monitoring_v3.Aggregation(
         alignment_period=Duration(seconds=60),
-        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_RATE)
+        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_MEAN)
 
     requests = {
         "Bytes": monitoring_v3.ListTimeSeriesRequest(
