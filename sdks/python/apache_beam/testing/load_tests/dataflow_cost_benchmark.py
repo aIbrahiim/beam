@@ -45,7 +45,7 @@ class DataflowCostBenchmark(LoadTest):
   If using InfluxDB with Basic HTTP authentication enabled, provide the
   following environment options: `INFLUXDB_USER` and `INFLUXDB_USER_PASSWORD`.
 
-  If the hardware configuration for the job includes use of a GPU, please 
+  If the hardware configuration for the job includes use of a GPU, please
   specify the version in use with the Accelerator enumeration. This is used to
   calculate the cost of the job later, as different accelerators have different
   billing rates per hour of use.
@@ -172,7 +172,7 @@ class DataflowCostBenchmark(LoadTest):
         start_time=start_time, end_time=end_time)
     aggregation = monitoring_v3.Aggregation(
         alignment_period=Duration(seconds=60),
-        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_MEAN)
+        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_RATE)
 
     requests = {
         "Bytes": monitoring_v3.ListTimeSeriesRequest(
@@ -222,6 +222,12 @@ class DataflowCostBenchmark(LoadTest):
 
     throughput_metrics = self._get_throughput_metrics(
         project, job_id, start_time, end_time)
+    if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
+        throughput_metrics.get('AvgThroughputElements', 0) == 0):
+      logging.warning(
+          'No throughput data for PCollection "%s". Check Dataflow job %s '
+          'graph for actual PCollection names (Runner v2 may use different '
+          'naming).', self.pcollection, job_id)
     return {
         **throughput_metrics,
         "JobRuntimeSeconds": self._get_job_runtime(start_time, end_time),
