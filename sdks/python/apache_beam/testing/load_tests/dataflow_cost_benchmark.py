@@ -148,21 +148,24 @@ class DataflowCostBenchmark(LoadTest):
   def _get_worker_time_interval(
       self, job_id: str) -> tuple[Optional[str], Optional[str]]:
     """Extracts worker start and stop times from job messages."""
-    messages, _ = self.dataflow_client.list_messages(
-      job_id=job_id,
-      start_time=None,
-      end_time=None,
-      minimum_importance='JOB_MESSAGE_DETAILED')
-
     start_time, end_time = None, None
-    for message in messages:
-      text = message.messageText
-      if text:
-        if self.WORKER_START_PATTERN.search(text):
-          start_time = message.time
-        if self.WORKER_STOP_PATTERN.search(text):
-          end_time = message.time
-
+    page_token = None
+    while True:
+      messages, page_token = self.dataflow_client.list_messages(
+        job_id=job_id,
+        start_time=None,
+        end_time=None,
+        page_token=page_token,
+        minimum_importance='JOB_MESSAGE_DETAILED')
+      for message in messages:
+        text = message.messageText
+        if text:
+          if self.WORKER_START_PATTERN.search(text):
+            start_time = message.time
+          if self.WORKER_STOP_PATTERN.search(text):
+            end_time = message.time
+      if not page_token or (start_time and end_time):
+        break
     return start_time, end_time
 
   def _get_throughput_metrics(
