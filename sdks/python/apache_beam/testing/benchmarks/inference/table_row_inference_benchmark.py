@@ -41,7 +41,7 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
     self.metrics_namespace = 'BeamML_TableInference'
     super().__init__(
         metrics_namespace=self.metrics_namespace,
-        pcollection='FormatOutput.out0')
+        pcollection='RunInference/BeamML_RunInference.out0')
 
   def test(self):
     """Execute the table row inference pipeline for benchmarking."""
