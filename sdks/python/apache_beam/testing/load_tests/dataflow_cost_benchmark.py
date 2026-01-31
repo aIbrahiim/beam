@@ -206,6 +206,43 @@ class DataflowCostBenchmark(LoadTest):
 
     return metrics
 
+  def _get_throughput_metrics_no_pcollection(
+      self, project: str, job_id: str, start_time: str,
+      end_time: str) -> dict[str, float]:
+    interval = monitoring_v3.TimeInterval(
+        start_time=start_time, end_time=end_time)
+    aggregation = monitoring_v3.Aggregation(
+        alignment_period=Duration(seconds=60),
+        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_MEAN)
+
+    requests = {
+        "Bytes": monitoring_v3.ListTimeSeriesRequest(
+            name=f"projects/{project}",
+            filter=f'metric.type='
+            f'"dataflow.googleapis.com/job/estimated_byte_count" '
+            f'AND metric.labels.job_id="{job_id}"',
+            interval=interval,
+            aggregation=aggregation),
+        "Elements": monitoring_v3.ListTimeSeriesRequest(
+            name=f"projects/{project}",
+            filter=f'metric.type="dataflow.googleapis.com/job/element_count" '
+            f'AND metric.labels.job_id="{job_id}"',
+            interval=interval,
+            aggregation=aggregation)
+    }
+
+    metrics = {}
+    for key, req in requests.items():
+      time_series = self.monitoring_client.list_time_series(request=req)
+      values = [
+          point.value.double_value for series in time_series
+          for point in series.points
+      ]
+      metrics[f"AvgThroughput{key}"] = sum(values) / len(
+          values) if values else 0.0
+
+    return metrics
+
   def _get_job_runtime(self, start_time: str, end_time: str) -> float:
     """Calculates the job runtime duration in seconds."""
     start_dt = datetime.fromisoformat(start_time[:-1])
@@ -219,8 +256,11 @@ class DataflowCostBenchmark(LoadTest):
     project = job.projectId
     start_time, end_time = self._get_worker_time_interval(job_id)
     if not start_time or not end_time:
-      logging.warning('Could not find valid worker start/end times.')
-      return {}
+      start_time = job.createTime
+      end_time = job.currentStateTime
+      if not start_time or not end_time:
+        logging.warning('Could not find valid worker start/end times.')
+        return {}
 
     try:
       start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
@@ -235,6 +275,10 @@ class DataflowCostBenchmark(LoadTest):
 
     throughput_metrics = self._get_throughput_metrics(
         project, job_id, query_start, query_end)
+    if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
+        throughput_metrics.get('AvgThroughputElements', 0) == 0):
+      throughput_metrics = self._get_throughput_metrics_no_pcollection(
+          project, job_id, query_start, query_end)
     if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
         throughput_metrics.get('AvgThroughputElements', 0) == 0):
       logging.warning(
