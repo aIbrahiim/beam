@@ -217,9 +217,17 @@ class DataflowCostBenchmark(LoadTest):
     job = self.dataflow_client.get_job(job_id)
     project = job.projectId
     start_time, end_time = self._get_worker_time_interval(job_id)
+
+    # Fallback to job timestamps if worker messages not found (Runner v2)
     if not start_time or not end_time:
-      logging.warning('Could not find valid worker start/end times.')
-      return {}
+      logging.warning(
+          'Could not find worker start/end times from job messages. '
+          'Falling back to job timestamps (Runner v2 compatibility).')
+      start_time = job.createTime
+      end_time = job.currentStateTime
+      if not start_time or not end_time:
+        logging.warning('Could not find valid job timestamps.')
+        return {}
 
     throughput_metrics = self._get_throughput_metrics(
         project, job_id, start_time, end_time)
