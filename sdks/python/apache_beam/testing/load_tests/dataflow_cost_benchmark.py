@@ -20,6 +20,7 @@ import logging
 import re
 import time
 from datetime import datetime
+from datetime import timedelta
 from typing import Any
 from typing import Optional
 
@@ -221,8 +222,19 @@ class DataflowCostBenchmark(LoadTest):
       logging.warning('Could not find valid worker start/end times.')
       return {}
 
+    try:
+      start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+      end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+      query_start = (start_dt - timedelta(minutes=5)).strftime(
+          '%Y-%m-%dT%H:%M:%S.%fZ')
+      query_end = (end_dt + timedelta(minutes=10)).strftime(
+          '%Y-%m-%dT%H:%M:%S.%fZ')
+    except (ValueError, AttributeError) as e:
+      logging.warning('Could not parse timestamps: %s', e)
+      query_start, query_end = start_time, end_time
+
     throughput_metrics = self._get_throughput_metrics(
-        project, job_id, start_time, end_time)
+        project, job_id, query_start, query_end)
     if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
         throughput_metrics.get('AvgThroughputElements', 0) == 0):
       logging.warning(
