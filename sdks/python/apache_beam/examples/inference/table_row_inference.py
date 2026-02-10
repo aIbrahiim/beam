@@ -1,4 +1,4 @@
-﻿#
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -233,6 +233,12 @@ def parse_known_args(argv):
       type=int,
       default=30,
       help='Trigger interval in seconds for streaming mode (default: 30)')
+  parser.add_argument(
+      '--input_expand_factor',
+      type=int,
+      default=1,
+      help='In batch mode: repeat each input line this many times to scale up '
+      'volume (e.g. 100k lines × 100 = 10M rows). Default 1 = no expansion.')
   return parser.parse_known_args(argv)
 
 
@@ -286,9 +292,18 @@ def run(
             allowed_lateness=0))
     write_method = beam.io.WriteToBigQuery.Method.STREAMING_INSERTS
   else:
-    input_data = (
+    read_lines = (
         pipeline
-        | 'ReadFromFile' >> beam.io.ReadFromText(known_args.input_file)
+        | 'ReadFromFile' >> beam.io.ReadFromText(known_args.input_file))
+    expand_factor = getattr(
+        known_args, 'input_expand_factor', 1) or 1
+    if expand_factor > 1:
+      read_lines = (
+          read_lines
+          | 'ExpandInput' >> beam.FlatMap(
+              lambda line: [line] * expand_factor))
+    input_data = (
+        read_lines
         | 'ParseToTableRows' >> beam.Map(
             lambda line: parse_json_to_table_row(
                 line.encode('utf-8'), feature_columns)))

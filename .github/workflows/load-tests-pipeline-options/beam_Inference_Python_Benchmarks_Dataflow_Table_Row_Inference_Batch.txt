@@ -31,6 +31,8 @@
 --influx_measurement=result_table_row_inference_batch
 --mode=batch
 --input_file=gs://temp-storage-for-perf-tests/abdoi/inputs/table_rows_100k_benchmark.jsonl
+# 100k lines × 100 = 10M rows; use 1000 for 100M rows
+--input_expand_factor=100
 --model_path=gs://temp-storage-for-perf-tests/abdoi/models/sklearn_table_classifier.pkl
 --feature_columns=feature1,feature2,feature3,feature4,feature5
 --output_table=apache-beam-testing:beam_run_inference.result_table_row_inference_batch_outputs
