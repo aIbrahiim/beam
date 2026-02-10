@@ -144,6 +144,41 @@ class DataflowCostBenchmark(LoadTest):
         system_metrics[metric.name] = entry.committed or 0.0
     return system_metrics
 
+  def _get_derived_throughput_from_job_metrics(
+      self,
+      result: DataflowPipelineResult,
+      runtime_seconds: float,
+  ) -> dict[str, float]:
+    """Derives AvgThroughputElements and AvgThroughputBytes from job metrics
+    when Cloud Monitoring returns no data. Uses ElementCount (max across steps)
+    and MeanByteCount from Dataflow job metrics."""
+    if runtime_seconds <= 0:
+      return {}
+    job_id = result.job_id()
+    metrics = result.metrics().all_metrics(job_id)
+    element_counts = []
+    mean_byte_count = None
+    for entry in metrics:
+      metric_key = entry.key
+      metric = metric_key.metric
+      if metric.namespace != 'dataflow/v1b3':
+        continue
+      val = entry.committed or 0.0
+      if metric.name == 'ElementCount':
+        element_counts.append(val)
+      elif metric.name == 'MeanByteCount' and val > 0:
+        if metric_key.step == '':
+          mean_byte_count = val
+        elif mean_byte_count is None:
+          mean_byte_count = val
+    total_elements = max(element_counts) if element_counts else 0
+    if total_elements <= 0 or mean_byte_count is None or mean_byte_count <= 0:
+      return {}
+    return {
+        'AvgThroughputElements': total_elements / runtime_seconds,
+        'AvgThroughputBytes': (total_elements * mean_byte_count) / runtime_seconds,
+    }
+
   def _get_worker_time_interval(
       self, job_id: str) -> tuple[Optional[str], Optional[str]]:
     """Extracts worker start and stop times from job messages."""
@@ -279,13 +314,23 @@ class DataflowCostBenchmark(LoadTest):
         throughput_metrics.get('AvgThroughputElements', 0) == 0):
       throughput_metrics = self._get_throughput_metrics_no_pcollection(
           project, job_id, query_start, query_end)
+    runtime_seconds = self._get_job_runtime(start_time, end_time)
     if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
-        throughput_metrics.get('AvgThroughputElements', 0) == 0):
-      logging.warning(
-          'No throughput data for PCollection "%s". Check Dataflow job %s '
-          'graph for actual PCollection names (Runner v2 may use different '
-          'naming).', self.pcollection, job_id)
+        throughput_metrics.get('AvgThroughputElements', 0) == 0 and
+        runtime_seconds > 0):
+      derived = self._get_derived_throughput_from_job_metrics(
+          result, runtime_seconds)
+      if derived:
+        throughput_metrics.update(derived)
+        logging.info(
+            'Using throughput derived from job metrics (Cloud Monitoring had '
+            'no data): %s', derived)
+      else:
+        logging.warning(
+            'No throughput data for PCollection "%s". Check Dataflow job %s '
+            'graph for actual PCollection names (Runner v2 may use different '
+            'naming).', self.pcollection, job_id)
     return {
         **throughput_metrics,
-        "JobRuntimeSeconds": self._get_job_runtime(start_time, end_time),
+        "JobRuntimeSeconds": runtime_seconds,
     }
