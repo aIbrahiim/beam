@@ -51,8 +51,10 @@ class DataflowCostBenchmark(LoadTest):
   billing rates per hour of use.
   """
 
-  WORKER_START_PATTERN = re.compile(r'All workers have finished the startup processes')
-  WORKER_STOP_PATTERN = re.compile(r'Stopping worker pool|Worker pool stopped')
+  WORKER_START_PATTERN = re.compile(
+      r'^All workers have finished the startup processes and '
+      r'began to receive work requests.*$')
+  WORKER_STOP_PATTERN = re.compile(r'^Stopping worker pool.*$')
 
   def __init__(
       self,
