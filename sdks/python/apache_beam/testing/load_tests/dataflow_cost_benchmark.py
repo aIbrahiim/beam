@@ -154,6 +154,7 @@ class DataflowCostBenchmark(LoadTest):
     """Extracts worker start and stop times from job messages."""
     start_time, end_time = None, None
     page_token = None
+    all_messages = []
     while True:
       messages, page_token = self.dataflow_client.list_messages(
         job_id=job_id,
@@ -164,12 +165,22 @@ class DataflowCostBenchmark(LoadTest):
       for message in messages:
         text = message.messageText
         if text:
+          all_messages.append(text)
           if self.WORKER_START_PATTERN.search(text):
             start_time = message.time
+            logging.info('Matched WORKER_START_PATTERN: %r', text)
           if self.WORKER_STOP_PATTERN.search(text):
             end_time = message.time
+            logging.info('Matched WORKER_STOP_PATTERN: %r', text)
       if not page_token or (start_time and end_time):
         break
+    if not start_time or not end_time:
+      logging.warning(
+          'Pattern matching failed. start_time=%s, end_time=%s. '
+          'Dumping all %d job messages for debugging:',
+          start_time, end_time, len(all_messages))
+      for i, msg in enumerate(all_messages):
+        logging.warning('  Message[%d]: %r', i, msg)
     return start_time, end_time
 
   def _get_throughput_metrics(
