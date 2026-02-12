@@ -52,12 +52,9 @@ class DataflowCostBenchmark(LoadTest):
   """
 
   WORKER_START_PATTERN = re.compile(
-      r'Workers have started successfully'
-      r'|All workers have finished the startup processes and '
+      r'All workers have finished the startup processes and '
       r'began to receive work requests')
-  WORKER_STOP_PATTERN = re.compile(
-      r'Tearing down pending resources'
-      r'|Stopping worker pool')
+  WORKER_STOP_PATTERN = re.compile(r'Stopping worker pool')
 
   def __init__(
       self,
