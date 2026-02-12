@@ -88,8 +88,8 @@ class DataflowCostBenchmark(LoadTest):
       self.test()
       if not hasattr(self, 'result'):
         self.result = self.pipeline.run()
-        state = self.result.wait_until_finish(duration=self.timeout_ms)
-        assert state != PipelineState.FAILED
+      state = self.result.wait_until_finish(duration=self.timeout_ms)
+      assert state != PipelineState.FAILED
 
       logging.info(
           'Pipeline complete, sleeping for 4 minutes to allow resource '
