@@ -309,6 +309,10 @@ def run(
                 line.encode('utf-8'), feature_columns)))
     write_method = beam.io.WriteToBigQuery.Method.FILE_LOADS
 
+  write_disposition = (
+      beam.io.BigQueryDisposition.WRITE_APPEND
+      if known_args.mode == 'streaming'
+      else beam.io.BigQueryDisposition.WRITE_TRUNCATE)
   _ = (
       input_data
       | 'RunInference' >> RunInference(KeyedModelHandler(model_handler))
@@ -316,7 +320,7 @@ def run(
       | 'WriteToBigQuery' >> beam.io.WriteToBigQuery(
           known_args.output_table,
           schema=output_schema,
-          write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+          write_disposition=write_disposition,
           create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED,
           method=write_method))
 
