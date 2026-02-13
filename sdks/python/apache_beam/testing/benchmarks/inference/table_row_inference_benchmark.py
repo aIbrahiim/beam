@@ -39,12 +39,13 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
   """
   def __init__(self):
     self.metrics_namespace = 'BeamML_TableInference'
-    mode = self.pipeline.get_option('mode') or 'batch'
     super().__init__(
         metrics_namespace=self.metrics_namespace,
-        is_streaming=(mode == 'streaming'),
+        is_streaming=False,
         pcollection='RunInference/BeamML_RunInference_Postprocess-0.out0',
         pcollection_fallbacks=['RunInference/BeamML_RunInference.out0'])
+    self.is_streaming = (
+        (self.pipeline.get_option('mode') or 'batch') == 'streaming')
 
   def test(self):
     """Execute the table row inference pipeline for benchmarking."""
