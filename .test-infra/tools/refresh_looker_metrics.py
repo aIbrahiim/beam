@@ -43,9 +43,7 @@ LOOKS_TO_DOWNLOAD = [
     ("82", ["263", "264", "265", "266", "267"]),  # PyTorch Sentiment Streaming DistilBERT base uncased
     ("85", ["268", "269", "270", "271", "272"]),  # PyTorch Sentiment Batch DistilBERT base uncased
     ("86", ["284", "285", "286", "287", "288"]),  # VLLM Batch Gemma
-    ("96", ["304", "305", "306", "307", "308"]),  # Table Row Inference Sklearn Batch
-]
-
+    ("96", ["270", "304", "305", "353", "354"]),  # Table Row Inference Sklearn Batch
 
 def get_look(id: str) -> models.Look:
     look = next(iter(sdk.search_looks(id=id)), None)
