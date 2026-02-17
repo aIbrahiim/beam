@@ -89,13 +89,13 @@ jobs:
         run: echo "NOW_UTC=$(date '+%m%d%H%M%S' --utc)" >> $GITHUB_ENV
       - name: Publish table row messages to Pub/Sub for streaming benchmark
         run: |
-          gsutil cp gs://apache-beam-ml/testing/inputs/table_rows_100k_benchmark.jsonl ./table_rows_100k_benchmark.jsonl
-          pip install google-cloud-pubsub
-          python -m apache_beam.examples.inference.publish_table_row_stream_messages \
+          pip install google-cloud-pubsub scikit-learn numpy
+          cd sdks/python && PYTHONPATH=. python -m apache_beam.examples.inference.table_row_inference_utils \
+            --action=publish_data \
             --project=apache-beam-testing \
             --topic=table_row_inference_benchmark \
-            --input_file=./table_rows_100k_benchmark.jsonl \
-            --max_messages=50000
+            --num_rows=50000 \
+            --num_features=5
       - name: run Table Row Inference Sklearn Stream
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
