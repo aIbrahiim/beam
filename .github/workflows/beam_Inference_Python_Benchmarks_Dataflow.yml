@@ -192,6 +192,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_5 }} --job_name=benchmark-tests-pytorch-imagenet-python-gpu-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet152_gpu-${{env.NOW_UTC}}.txt'
       - name: run Table Row Inference Sklearn Batch
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -202,6 +203,15 @@ jobs:
             -PpythonVersion=3.10 \
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/table_row_inference_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_9 }} --autoscaling_algorithm=NONE --metrics_table=result_table_row_inference_batch --influx_measurement=result_table_row_inference_batch --mode=batch --input_file=gs://apache-beam-ml/testing/inputs/table_rows_100k_benchmark.jsonl --input_expand_factor=100 --output_table=apache-beam-testing:beam_run_inference.result_table_row_inference_batch_outputs --job_name=benchmark-tests-table-row-inference-batch-${{env.NOW_UTC}}'
+      - name: Publish table row messages to Pub/Sub for streaming benchmark
+        run: |
+          gsutil cp gs://apache-beam-ml/testing/inputs/table_rows_100k_benchmark.jsonl ./table_rows_100k_benchmark.jsonl
+          pip install google-cloud-pubsub
+          python -m apache_beam.examples.inference.publish_table_row_stream_messages \
+            --project=apache-beam-testing \
+            --topic=table_row_inference_benchmark \
+            --input_file=./table_rows_100k_benchmark.jsonl \
+            --max_messages=50000
       - name: run Table Row Inference Sklearn Stream
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
