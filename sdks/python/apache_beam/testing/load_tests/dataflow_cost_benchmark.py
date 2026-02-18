@@ -85,7 +85,6 @@ class DataflowCostBenchmark(LoadTest):
       if not hasattr(self, 'result'):
         self.result = self.pipeline.run()
       state = self.result.wait_until_finish(duration=self.timeout_ms)
-      logging.warning('DEBUG_AGENT run: state=%s is_streaming=%s', state, self.is_streaming)
       assert state != PipelineState.FAILED
 
       logging.info(
@@ -148,6 +147,14 @@ class DataflowCostBenchmark(LoadTest):
       metric_key = entry.key
       metric = metric_key.metric
       if metric_key.step == '' and metric.namespace == 'dataflow/v1b3':
+        # region agent log
+        if metric.name == 'TotalStreamingDataProcessed':
+          logging.warning(
+              'DEBUG_AGENT _process_metrics: name=%s committed=%r '
+              'attempted=%r type_committed=%s type_attempted=%s',
+              metric.name, entry.committed, entry.attempted,
+              type(entry.committed).__name__, type(entry.attempted).__name__)
+        # endregion agent log
         system_metrics[metric.name] = entry.committed or 0.0
     return system_metrics
 
