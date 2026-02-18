@@ -87,15 +87,6 @@ class DataflowCostBenchmark(LoadTest):
       state = self.result.wait_until_finish(duration=self.timeout_ms)
       assert state != PipelineState.FAILED
 
-      if self.is_streaming and not PipelineState.is_terminal(state):
-        logging.info(
-            'Draining streaming job %s after timeout.',
-            self.result.job_id())
-        self.dataflow_client.modify_job_state(
-            self.result.job_id(), 'JOB_STATE_DRAINING')
-        drain_state = self.result.wait_until_finish(duration=600000)
-        logging.info('Streaming job drained. State: %s', drain_state)
-
       logging.info(
           'Pipeline complete, sleeping for 4 minutes to allow resource '
           'metrics to populate.')
