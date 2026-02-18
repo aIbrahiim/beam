@@ -61,19 +61,12 @@ class DataflowCostBenchmark(LoadTest):
       metrics_namespace: Optional[str] = None,
       is_streaming: bool = False,
       gpu: Optional[costs.Accelerator] = None,
-      pcollection: str = 'ProcessOutput.out0'):
-    """
-    Initializes DataflowCostBenchmark.
-
-    Args:
-        metrics_namespace (Optional[str]): Namespace for metrics.
-        is_streaming (bool): Whether the pipeline is streaming or batch.
-        gpu (Optional[costs.Accelerator]): Optional GPU type.
-        pcollection (str): PCollection name to monitor throughput.
-    """
+      pcollection: str = 'ProcessOutput.out0',
+      subscription: Optional[str] = None):
     self.is_streaming = is_streaming
     self.gpu = gpu
     self.pcollection = pcollection
+    self.subscription = subscription
     super().__init__(metrics_namespace=metrics_namespace)
     self.dataflow_client = DataflowApplicationClient(
         self.pipeline.get_pipeline_options())
@@ -241,83 +234,70 @@ class DataflowCostBenchmark(LoadTest):
 
     return metrics
 
+  def _get_streaming_throughput_metrics(
+      self,
+      project: str,
+      start_time: str,
+      end_time: str) -> dict[str, float]:
+    """Query Cloud Monitoring for Pub/Sub subscription throughput metrics.
+
+    Streaming Engine jobs do not emit per-PCollection estimated_byte_count
+    or element_count to Cloud Monitoring. Instead, query the Pub/Sub
+    subscription metrics which ARE available for streaming.
+    """
+    if not self.subscription:
+      logging.warning('No subscription configured for streaming throughput.')
+      return {'AvgThroughputBytes': 0.0, 'AvgThroughputElements': 0.0}
+
+    sub_parts = self.subscription.split('/')
+    subscription_id = sub_parts[-1] if sub_parts else self.subscription
+
+    interval = monitoring_v3.TimeInterval(
+        start_time=start_time, end_time=end_time)
+    aggregation = monitoring_v3.Aggregation(
+        alignment_period=Duration(seconds=60),
+        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_RATE)
+
+    requests = {
+        "Bytes": monitoring_v3.ListTimeSeriesRequest(
+            name=f"projects/{project}",
+            filter=f'metric.type='
+            f'"pubsub.googleapis.com/subscription/byte_cost" '
+            f'AND resource.labels.subscription_id="{subscription_id}"',
+            interval=interval,
+            aggregation=aggregation),
+        "Elements": monitoring_v3.ListTimeSeriesRequest(
+            name=f"projects/{project}",
+            filter=f'metric.type='
+            f'"pubsub.googleapis.com/subscription/sent_message_count" '
+            f'AND resource.labels.subscription_id="{subscription_id}"',
+            interval=interval,
+            aggregation=aggregation),
+    }
+
+    metrics = {}
+    for key, req in requests.items():
+      time_series = list(
+          self.monitoring_client.list_time_series(request=req))
+      values = [
+          point.value.double_value for series in time_series
+          for point in series.points
+      ]
+      avg_rate = sum(values) / len(values) if values else 0.0
+      logging.warning(
+          'DEBUG_AGENT pubsub_%s: subscription=%s series=%d points=%d '
+          'avg_rate=%.4f sample_values=%s',
+          key, subscription_id, len(time_series), len(values),
+          avg_rate, values[:5])
+      metrics[f"AvgThroughput{key}"] = avg_rate
+
+    return metrics
+
   def _get_job_runtime(self, start_time: str, end_time: str) -> float:
     """Calculates the job runtime duration in seconds."""
     start_dt = datetime.fromisoformat(start_time[:-1])
     end_dt = datetime.fromisoformat(end_time[:-1])
     return (end_dt - start_dt).total_seconds()
-
-  def _scan_cloud_monitoring(
-      self,
-      project: str,
-      job_id: str,
-      start_time: str,
-      end_time: str) -> None:
-    """Diagnostic: scan Cloud Monitoring for all available Dataflow metrics."""
-    interval = monitoring_v3.TimeInterval(
-        start_time=start_time, end_time=end_time)
-    aggregation = monitoring_v3.Aggregation(
-        alignment_period=Duration(seconds=60),
-        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_MEAN)
-    metric_types = [
-        'dataflow.googleapis.com/job/estimated_byte_count',
-        'dataflow.googleapis.com/job/element_count',
-        'dataflow.googleapis.com/job/data_watermark_age',
-        'dataflow.googleapis.com/job/system_lag',
-        'dataflow.googleapis.com/job/elapsed_time',
-        'dataflow.googleapis.com/job/elements_produced_count',
-        'dataflow.googleapis.com/job/per_stage_data_watermark_age',
-        'dataflow.googleapis.com/job/per_stage_system_lag',
-    ]
-    for mt in metric_types:
-      try:
-        request = monitoring_v3.ListTimeSeriesRequest(
-            name=f"projects/{project}",
-            filter=f'metric.type="{mt}" '
-            f'AND metric.labels.job_id="{job_id}"',
-            interval=interval,
-            aggregation=aggregation)
-        series_list = list(
-            self.monitoring_client.list_time_series(request=request))
-        if series_list:
-          labels_summary = [
-              dict(s.metric.labels) for s in series_list[:5]]
-          num_points = sum(len(s.points) for s in series_list)
-          logging.warning(
-              'DEBUG_AGENT cm_scan: metric=%s series=%d points=%d '
-              'labels_sample=%s', mt, len(series_list), num_points,
-              labels_summary)
-        else:
-          logging.warning(
-              'DEBUG_AGENT cm_scan: metric=%s series=0', mt)
-      except Exception as e:
-        logging.warning(
-            'DEBUG_AGENT cm_scan: metric=%s error=%s', mt, e)
-
-  def _dump_api_metrics(self,
-                        result: DataflowPipelineResult) -> None:
-    """Diagnostic: dump all Dataflow API metrics to find usable data."""
-    job_id = result.job_id()
-    all_m = result.metrics().all_metrics(job_id)
-    interesting = []
-    for entry in all_m:
-      mk = entry.key
-      m = mk.metric
-      has_value = (entry.committed is not None or
-                   entry.attempted is not None)
-      if has_value:
-        interesting.append({
-            'step': mk.step[:60] if mk.step else '',
-            'ns': m.namespace,
-            'name': m.name,
-            'committed': repr(entry.committed)[:60],
-            'attempted': repr(entry.attempted)[:60],
-        })
-    logging.warning(
-        'DEBUG_AGENT api_metrics_count: total=%d with_value=%d',
-        len(all_m), len(interesting))
-    for item in interesting[:40]:
-      logging.warning('DEBUG_AGENT api_metric: %s', item)
 
   def _get_additional_metrics(self,
                               result: DataflowPipelineResult) -> dict[str, Any]:
@@ -337,15 +317,16 @@ class DataflowCostBenchmark(LoadTest):
         'DEBUG_AGENT _get_additional_metrics: runtime_seconds=%.1f',
         runtime_seconds)
 
-    self._scan_cloud_monitoring(
-        project, job_id, start_time, end_time)
-    self._dump_api_metrics(result)
+    if self.is_streaming:
+      throughput_metrics = self._get_streaming_throughput_metrics(
+          project, start_time, end_time)
+    else:
+      throughput_metrics = self._get_throughput_metrics(
+          project, job_id, start_time, end_time)
 
-    throughput_metrics = self._get_throughput_metrics(
-        project, job_id, start_time, end_time)
     logging.warning(
-        'DEBUG_AGENT throughput_result=%s pcollection=%s',
-        throughput_metrics, self.pcollection)
+        'DEBUG_AGENT throughput_result=%s is_streaming=%s',
+        throughput_metrics, self.is_streaming)
 
     return {
         **throughput_metrics,
