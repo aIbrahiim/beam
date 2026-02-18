@@ -273,6 +273,78 @@ class DataflowCostBenchmark(LoadTest):
     end_dt = datetime.fromisoformat(end_time[:-1])
     return (end_dt - start_dt).total_seconds()
 
+  def _scan_cloud_monitoring(
+      self,
+      project: str,
+      job_id: str,
+      start_time: str,
+      end_time: str) -> None:
+    """Diagnostic: scan Cloud Monitoring for all available Dataflow metrics."""
+    interval = monitoring_v3.TimeInterval(
+        start_time=start_time, end_time=end_time)
+    aggregation = monitoring_v3.Aggregation(
+        alignment_period=Duration(seconds=60),
+        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_MEAN)
+    metric_types = [
+        'dataflow.googleapis.com/job/estimated_byte_count',
+        'dataflow.googleapis.com/job/element_count',
+        'dataflow.googleapis.com/job/data_watermark_age',
+        'dataflow.googleapis.com/job/system_lag',
+        'dataflow.googleapis.com/job/elapsed_time',
+        'dataflow.googleapis.com/job/elements_produced_count',
+        'dataflow.googleapis.com/job/per_stage_data_watermark_age',
+        'dataflow.googleapis.com/job/per_stage_system_lag',
+    ]
+    for mt in metric_types:
+      try:
+        request = monitoring_v3.ListTimeSeriesRequest(
+            name=f"projects/{project}",
+            filter=f'metric.type="{mt}" '
+            f'AND metric.labels.job_id="{job_id}"',
+            interval=interval,
+            aggregation=aggregation)
+        series_list = list(
+            self.monitoring_client.list_time_series(request=request))
+        if series_list:
+          labels_summary = [
+              dict(s.metric.labels) for s in series_list[:5]]
+          num_points = sum(len(s.points) for s in series_list)
+          logging.warning(
+              'DEBUG_AGENT cm_scan: metric=%s series=%d points=%d '
+              'labels_sample=%s', mt, len(series_list), num_points,
+              labels_summary)
+        else:
+          logging.warning(
+              'DEBUG_AGENT cm_scan: metric=%s series=0', mt)
+      except Exception as e:
+        logging.warning(
+            'DEBUG_AGENT cm_scan: metric=%s error=%s', mt, e)
+
+  def _dump_api_metrics(self,
+                        result: DataflowPipelineResult) -> None:
+    """Diagnostic: dump all Dataflow API metrics to find usable data."""
+    job_id = result.job_id()
+    all_m = result.metrics().all_metrics(job_id)
+    interesting = []
+    for entry in all_m:
+      mk = entry.key
+      m = mk.metric
+      has_value = (entry.committed is not None or
+                   entry.attempted is not None)
+      if has_value:
+        interesting.append({
+            'step': mk.step[:60] if mk.step else '',
+            'ns': m.namespace,
+            'name': m.name,
+            'committed': repr(entry.committed)[:60],
+            'attempted': repr(entry.attempted)[:60],
+        })
+    logging.warning(
+        'DEBUG_AGENT api_metrics_count: total=%d with_value=%d',
+        len(all_m), len(interesting))
+    for item in interesting[:40]:
+      logging.warning('DEBUG_AGENT api_metric: %s', item)
+
   def _get_additional_metrics(self,
                               result: DataflowPipelineResult) -> dict[str, Any]:
     job_id = result.job_id()
@@ -290,6 +362,11 @@ class DataflowCostBenchmark(LoadTest):
     logging.warning(
         'DEBUG_AGENT _get_additional_metrics: runtime_seconds=%.1f',
         runtime_seconds)
+
+    if self.is_streaming:
+      self._scan_cloud_monitoring(
+          project, job_id, start_time, end_time)
+      self._dump_api_metrics(result)
 
     throughput_metrics = self._get_throughput_metrics(
         project, job_id, start_time, end_time)
