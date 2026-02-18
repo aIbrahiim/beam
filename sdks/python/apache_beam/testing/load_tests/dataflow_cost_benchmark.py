@@ -147,14 +147,12 @@ class DataflowCostBenchmark(LoadTest):
       metric_key = entry.key
       metric = metric_key.metric
       if metric_key.step == '' and metric.namespace == 'dataflow/v1b3':
-        # region agent log
         if metric.name == 'TotalStreamingDataProcessed':
           logging.warning(
               'DEBUG_AGENT _process_metrics: name=%s committed=%r '
               'attempted=%r type_committed=%s type_attempted=%s',
               metric.name, entry.committed, entry.attempted,
               type(entry.committed).__name__, type(entry.attempted).__name__)
-        # endregion agent log
         system_metrics[metric.name] = entry.committed or 0.0
     return system_metrics
 
@@ -198,6 +196,32 @@ class DataflowCostBenchmark(LoadTest):
           start_time, end_time, len(all_messages))
     return start_time, end_time
 
+  def _discover_pcollection_names(
+      self,
+      project: str,
+      job_id: str,
+      start_time: str,
+      end_time: str) -> list[str]:
+    """Discover all PCollection names reported by Cloud Monitoring for a job."""
+    interval = monitoring_v3.TimeInterval(
+        start_time=start_time, end_time=end_time)
+    aggregation = monitoring_v3.Aggregation(
+        alignment_period=Duration(seconds=60),
+        per_series_aligner=monitoring_v3.Aggregation.Aligner.ALIGN_MEAN)
+    request = monitoring_v3.ListTimeSeriesRequest(
+        name=f"projects/{project}",
+        filter=f'metric.type='
+        f'"dataflow.googleapis.com/job/estimated_byte_count" '
+        f'AND metric.labels.job_id="{job_id}"',
+        interval=interval,
+        aggregation=aggregation)
+    names = set()
+    for series in self.monitoring_client.list_time_series(request=request):
+      pcol = series.metric.labels.get("pcollection", "")
+      if pcol:
+        names.add(pcol)
+    return sorted(names)
+
   def _get_throughput_metrics(
       self,
       project: str,
@@ -205,7 +229,7 @@ class DataflowCostBenchmark(LoadTest):
       start_time: str,
       end_time: str,
       pcollection_name: Optional[str] = None) -> dict[str, float]:
-    """Query Cloud Monitoring for per-PCollection throughput (batch jobs)."""
+    """Query Cloud Monitoring for per-PCollection throughput."""
     name = pcollection_name if pcollection_name is not None else self.pcollection
     interval = monitoring_v3.TimeInterval(
         start_time=start_time, end_time=end_time)
@@ -267,30 +291,30 @@ class DataflowCostBenchmark(LoadTest):
         'DEBUG_AGENT _get_additional_metrics: runtime_seconds=%.1f',
         runtime_seconds)
 
-    if self.is_streaming:
-      total_bytes = self.extra_metrics.get(
-          'TotalStreamingDataProcessed', 0.0)
-      logging.warning(
-          'DEBUG_AGENT streaming_branch: TotalStreamingDataProcessed=%s '
-          'extra_metrics_keys=%s', total_bytes, list(self.extra_metrics.keys()))
-      avg_throughput = total_bytes / runtime_seconds if runtime_seconds > 0 else 0.0
-      throughput_metrics = {
-          'AvgThroughputBytes': avg_throughput,
-          'AvgThroughputElements': 0.0,
-      }
-      logging.info(
-          'Streaming throughput: TotalStreamingDataProcessed=%.2f bytes, '
-          'runtime=%.1f sec, AvgThroughputBytes=%.4f',
-          total_bytes, runtime_seconds, avg_throughput)
-    else:
-      throughput_metrics = self._get_throughput_metrics(
+    throughput_metrics = self._get_throughput_metrics(
+        project, job_id, start_time, end_time)
+    logging.warning(
+        'DEBUG_AGENT throughput_with_configured_pcol=%s pcollection=%s',
+        throughput_metrics, self.pcollection)
+
+    if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
+        throughput_metrics.get('AvgThroughputElements', 0) == 0):
+      discovered = self._discover_pcollection_names(
           project, job_id, start_time, end_time)
-      if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
-          throughput_metrics.get('AvgThroughputElements', 0) == 0):
+      logging.warning(
+          'DEBUG_AGENT no data for "%s", discovered pcollections: %s',
+          self.pcollection, discovered)
+      for pcol in discovered:
+        candidate = self._get_throughput_metrics(
+            project, job_id, start_time, end_time,
+            pcollection_name=pcol)
         logging.warning(
-            'No throughput data for PCollection "%s". Check Dataflow job %s '
-            'graph for actual PCollection names (Runner v2 may use different '
-            'naming).', self.pcollection, job_id)
+            'DEBUG_AGENT trying pcollection="%s" -> %s', pcol, candidate)
+        if candidate.get('AvgThroughputBytes', 0) > 0:
+          throughput_metrics = candidate
+          logging.info(
+              'Using auto-discovered PCollection "%s" for throughput.', pcol)
+          break
 
     return {
         **throughput_metrics,
