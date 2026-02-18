@@ -85,6 +85,7 @@ class DataflowCostBenchmark(LoadTest):
       if not hasattr(self, 'result'):
         self.result = self.pipeline.run()
       state = self.result.wait_until_finish(duration=self.timeout_ms)
+      logging.warning('DEBUG_AGENT run: state=%s is_streaming=%s', state, self.is_streaming)
       assert state != PipelineState.FAILED
 
       logging.info(
@@ -93,11 +94,16 @@ class DataflowCostBenchmark(LoadTest):
       time.sleep(240)
 
       self.extra_metrics = self._retrieve_cost_metrics(self.result)
+      logging.warning('DEBUG_AGENT run: extra_metrics_after_cost=%s', self.extra_metrics)
       additional_metrics = self._get_additional_metrics(self.result)
+      logging.warning('DEBUG_AGENT run: additional_metrics=%s', additional_metrics)
       self.extra_metrics.update(additional_metrics)
 
       logging.info(self.extra_metrics)
       self._metrics_monitor.publish_metrics(self.result, self.extra_metrics)
+    except Exception as e:
+      logging.warning('DEBUG_AGENT run: EXCEPTION=%s', e, exc_info=True)
+      raise
     finally:
       self.cleanup()
 
@@ -242,17 +248,24 @@ class DataflowCostBenchmark(LoadTest):
     job = self.dataflow_client.get_job(job_id)
     project = job.projectId
     start_time, end_time = self._get_worker_time_interval(job_id)
+    logging.warning(
+        'DEBUG_AGENT _get_additional_metrics: start_time=%s end_time=%s '
+        'is_streaming=%s', start_time, end_time, self.is_streaming)
     if not start_time or not end_time:
       logging.warning('Could not find valid worker start/end times.')
       return {}
 
     runtime_seconds = self._get_job_runtime(start_time, end_time)
+    logging.warning(
+        'DEBUG_AGENT _get_additional_metrics: runtime_seconds=%.1f',
+        runtime_seconds)
 
     if self.is_streaming:
-      # Streaming Engine does not report per-PCollection estimated_byte_count
-      # to Cloud Monitoring. Compute throughput from system metrics instead.
       total_bytes = self.extra_metrics.get(
           'TotalStreamingDataProcessed', 0.0)
+      logging.warning(
+          'DEBUG_AGENT streaming_branch: TotalStreamingDataProcessed=%s '
+          'extra_metrics_keys=%s', total_bytes, list(self.extra_metrics.keys()))
       avg_throughput = total_bytes / runtime_seconds if runtime_seconds > 0 else 0.0
       throughput_metrics = {
           'AvgThroughputBytes': avg_throughput,
