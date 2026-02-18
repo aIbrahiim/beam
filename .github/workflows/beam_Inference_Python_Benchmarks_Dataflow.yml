@@ -87,6 +87,29 @@ jobs:
             ${{ github.workspace }}/.github/workflows/load-tests-pipeline-options/beam_Inference_Python_Benchmarks_Dataflow_Table_Row_Inference_Stream.txt
       - name: get current time
         run: echo "NOW_UTC=$(date '+%m%d%H%M%S' --utc)" >> $GITHUB_ENV
+      - name: Publish table row messages to Pub/Sub for streaming benchmark
+        run: |
+          pip install google-cloud-pubsub numpy
+          python - <<'PY'
+          import json
+          import time
+          import numpy as np
+          from google.cloud import pubsub_v1
+          publisher = pubsub_v1.PublisherClient()
+          topic_path = publisher.topic_path('apache-beam-testing', 'table_row_inference_benchmark')
+          num_rows, num_features, batch_size = 500_000, 5, 5000
+          for start in range(0, num_rows, batch_size):
+            futures = []
+            for i in range(start, min(start + batch_size, num_rows)):
+              row = {'id': f'row_{i}', 'timestamp': time.time()}
+              for j in range(num_features):
+                row[f'feature{j+1}'] = float(np.random.randn())
+              futures.append(publisher.publish(topic_path, json.dumps(row).encode('utf-8')))
+            for f in futures:
+              f.result()
+            print(f'Published {min(start + batch_size, num_rows)} / {num_rows} messages')
+          print(f'Done. Published {num_rows} messages to {topic_path}')
+          PY
       - name: run Table Row Inference Sklearn Stream
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180

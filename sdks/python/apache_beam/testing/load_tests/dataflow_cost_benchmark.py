@@ -87,6 +87,15 @@ class DataflowCostBenchmark(LoadTest):
       state = self.result.wait_until_finish(duration=self.timeout_ms)
       assert state != PipelineState.FAILED
 
+      if self.is_streaming and not PipelineState.is_terminal(state):
+        logging.info(
+            'Draining streaming job %s after timeout.',
+            self.result.job_id())
+        self.dataflow_client.modify_job_state(
+            self.result.job_id(), 'JOB_STATE_DRAINING')
+        drain_state = self.result.wait_until_finish(duration=600000)
+        logging.info('Streaming job drained. State: %s', drain_state)
+
       logging.info(
           'Pipeline complete, sleeping for 4 minutes to allow resource '
           'metrics to populate.')
@@ -151,6 +160,7 @@ class DataflowCostBenchmark(LoadTest):
     start_time, end_time = None, None
     page_token = None
     all_messages = []
+    last_message_time = None
     while True:
       messages, page_token = self.dataflow_client.list_messages(
         job_id=job_id,
@@ -160,6 +170,8 @@ class DataflowCostBenchmark(LoadTest):
         minimum_importance='JOB_MESSAGE_DEBUG')
       for message in messages:
         text = message.messageText
+        if getattr(message, 'time', None):
+          last_message_time = message.time
         if text:
           all_messages.append(text)
           if self.WORKER_START_PATTERN.search(text):
@@ -170,13 +182,16 @@ class DataflowCostBenchmark(LoadTest):
             logging.info('Matched WORKER_STOP_PATTERN: %r', text)
       if not page_token or (start_time and end_time):
         break
+    if start_time and not end_time and self.is_streaming and last_message_time:
+      end_time = last_message_time
+      logging.info(
+          'Using last job message time as end_time for streaming job: %s',
+          end_time)
     if not start_time or not end_time:
       logging.warning(
-          'Pattern matching failed. start_time=%s, end_time=%s. '
-          'Dumping all %d job messages for debugging:',
+          'Could not determine worker time interval. '
+          'start_time=%s, end_time=%s, total messages=%d',
           start_time, end_time, len(all_messages))
-      for i, msg in enumerate(all_messages):
-        logging.warning('  Message[%d]: %r', i, msg)
     return start_time, end_time
 
   def _get_throughput_metrics(
@@ -186,6 +201,7 @@ class DataflowCostBenchmark(LoadTest):
       start_time: str,
       end_time: str,
       pcollection_name: Optional[str] = None) -> dict[str, float]:
+    """Query Cloud Monitoring for per-PCollection throughput (batch jobs)."""
     name = pcollection_name if pcollection_name is not None else self.pcollection
     interval = monitoring_v3.TimeInterval(
         start_time=start_time, end_time=end_time)
@@ -239,18 +255,32 @@ class DataflowCostBenchmark(LoadTest):
       logging.warning('Could not find valid worker start/end times.')
       return {}
 
-    query_start = start_time
-    query_end = end_time
-
-    throughput_metrics = self._get_throughput_metrics(
-        project, job_id, query_start, query_end)
     runtime_seconds = self._get_job_runtime(start_time, end_time)
-    if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
-        throughput_metrics.get('AvgThroughputElements', 0) == 0):
-      logging.warning(
-          'No throughput data for PCollection "%s". Check Dataflow job %s '
-          'graph for actual PCollection names (Runner v2 may use different '
-          'naming).', self.pcollection, job_id)
+
+    if self.is_streaming:
+      # Streaming Engine does not report per-PCollection estimated_byte_count
+      # to Cloud Monitoring. Compute throughput from system metrics instead.
+      total_bytes = self.extra_metrics.get(
+          'TotalStreamingDataProcessed', 0.0)
+      avg_throughput = total_bytes / runtime_seconds if runtime_seconds > 0 else 0.0
+      throughput_metrics = {
+          'AvgThroughputBytes': avg_throughput,
+          'AvgThroughputElements': 0.0,
+      }
+      logging.info(
+          'Streaming throughput: TotalStreamingDataProcessed=%.2f bytes, '
+          'runtime=%.1f sec, AvgThroughputBytes=%.4f',
+          total_bytes, runtime_seconds, avg_throughput)
+    else:
+      throughput_metrics = self._get_throughput_metrics(
+          project, job_id, start_time, end_time)
+      if (throughput_metrics.get('AvgThroughputBytes', 0) == 0 and
+          throughput_metrics.get('AvgThroughputElements', 0) == 0):
+        logging.warning(
+            'No throughput data for PCollection "%s". Check Dataflow job %s '
+            'graph for actual PCollection names (Runner v2 may use different '
+            'naming).', self.pcollection, job_id)
+
     return {
         **throughput_metrics,
         "JobRuntimeSeconds": runtime_seconds,

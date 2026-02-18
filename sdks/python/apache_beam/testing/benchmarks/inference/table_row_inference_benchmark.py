@@ -24,7 +24,28 @@ table row inputs, including throughput, latency, and cost metrics.
 import logging
 
 from apache_beam.examples.inference import table_row_inference
+from apache_beam.options.pipeline_options import DebugOptions
+from apache_beam.options.pipeline_options import GoogleCloudOptions
+from apache_beam.options.pipeline_options import SetupOptions
+from apache_beam.options.pipeline_options import StandardOptions
+from apache_beam.options.pipeline_options import WorkerOptions
 from apache_beam.testing.load_tests.dataflow_cost_benchmark import DataflowCostBenchmark
+from apache_beam.testing.load_tests.load_test import LoadTestOptions
+
+
+class TableRowInferenceOptions(
+    LoadTestOptions,
+    StandardOptions,
+    GoogleCloudOptions,
+    WorkerOptions,
+    DebugOptions,
+    SetupOptions,
+):
+  """PipelineOptions that includes LoadTestOptions and standard Beam options
+  so that table-row-specific flags (--mode, --model_path, etc.) are recognized
+  and "Unparseable argument" warnings are avoided when running the load test.
+  """
+  pass
 
 
 class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
@@ -37,6 +58,8 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
   - Throughput: Elements processed per second
   - Cost: Estimated cost on Dataflow
   """
+  options_class = TableRowInferenceOptions
+
   def __init__(self):
     self.metrics_namespace = 'BeamML_TableInference'
     # Base class requires is_streaming at init; actual value set from pipeline --mode below.

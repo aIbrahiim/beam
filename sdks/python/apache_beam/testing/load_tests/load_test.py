@@ -70,6 +70,42 @@ class LoadTestOptions(PipelineOptions):
         default=0,
         help='Waiting time for the completion of the pipeline in milliseconds.'
         'Defaults to waiting forever.')
+    # Table row inference (and similar) pipeline options; avoids "Unparseable
+    # argument" when running with load test args that include these flags.
+    parser.add_argument(
+        '--mode',
+        default='batch',
+        help='Pipeline mode: streaming or batch.')
+    parser.add_argument(
+        '--input_subscription',
+        help='Pub/Sub subscription for streaming mode.')
+    parser.add_argument(
+        '--input_file',
+        help='Input file path for batch mode.')
+    parser.add_argument(
+        '--output_table',
+        help='BigQuery output table.')
+    parser.add_argument(
+        '--model_path',
+        help='Path to saved model file.')
+    parser.add_argument(
+        '--feature_columns',
+        help='Comma-separated list of feature column names.')
+    parser.add_argument(
+        '--window_size_sec',
+        type=int,
+        default=60,
+        help='Window size in seconds for streaming mode.')
+    parser.add_argument(
+        '--trigger_interval_sec',
+        type=int,
+        default=30,
+        help='Trigger interval in seconds for streaming mode.')
+    parser.add_argument(
+        '--input_expand_factor',
+        type=int,
+        default=1,
+        help='In batch mode: repeat each input line this many times.')
 
   @staticmethod
   def _str_to_boolean(value):
@@ -93,7 +129,14 @@ class LoadTest(object):
   """
   def __init__(self, metrics_namespace=None):
     # Be sure to set blocking to false for timeout_ms to work properly
-    self.pipeline = TestPipeline(is_integration_test=True, blocking=False)
+    options_class = getattr(self.__class__, 'options_class', None)
+    if options_class is not None:
+      options_list = TestPipeline.get_options_list()
+      options = options_class(options_list)
+      self.pipeline = TestPipeline(
+          options=options, is_integration_test=True, blocking=False)
+    else:
+      self.pipeline = TestPipeline(is_integration_test=True, blocking=False)
     assert not self.pipeline.blocking
 
     options = self.pipeline.get_pipeline_options().view_as(LoadTestOptions)
