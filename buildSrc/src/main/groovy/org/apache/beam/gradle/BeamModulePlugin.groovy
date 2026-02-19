@@ -3164,15 +3164,26 @@ class BeamModulePlugin implements Plugin<Project> {
         dependsOn ':sdks:python:sdist'
         doLast {
           def distTarBall = "${pythonRootDir}/build/apache-beam.tar.gz"
-          def packages = "gcp,test,aws,azure,dataframe"
           def extra = project.findProperty('beamPythonExtra')
+          def extraList = []
           if (extra) {
-            packages += ",${extra}"
+            extraList = extra.split(',').collect { it.trim() }.findAll { it }
           }
+          def mlExtras = extraList.findAll {
+            it in ['ml_test', 'p312_ml_test', 'p313_ml_test', 'ml_cpu', 'torch', 'tensorflow', 'transformers', 'tft', 'onnx']
+          }
+          def nonMlExtras = extraList.findAll { !(it in mlExtras) }
+          def baseExtras = (['gcp', 'test', 'aws', 'azure', 'dataframe'] + nonMlExtras).unique()
 
           project.exec {
             executable 'sh'
-            args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 --no-cache-dir ${distTarBall}[${packages}]"
+            args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 --no-cache-dir ${distTarBall}[${baseExtras.join(',')}]"
+          }
+          if (!mlExtras.isEmpty()) {
+            project.exec {
+              executable 'sh'
+              args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 --no-cache-dir ${distTarBall}[${mlExtras.join(',')}]"
+            }
           }
         }
       }
