@@ -3121,9 +3121,10 @@ class BeamModulePlugin implements Plugin<Project> {
             // TODO: https://github.com/apache/beam/issues/29022
             // pip 23.3 is failing due to Hash mismatch between expected SHA of the packaged and actual SHA.
             // until it is resolved on pip's side, don't use pip's cache.
-            // pip 25.1 casues :sdks:python:installGcpTest stuck. Pin to 25.0.1 for now.
+            // pip 25.1 causes :sdks:python:installGcpTest stuck (https://github.com/apache/beam/issues/34798).
+            // Pin to 26.0.1 (latest stable, used in Beam containers); 25.0.1 also works.
             args '-c', ". ${project.ext.envdir}/bin/activate && " +
-                "pip install --pre --retries 10 --upgrade pip==25.0.1 --no-cache-dir && " +
+                "pip install --pre --retries 10 --upgrade pip==26.0.1 --no-cache-dir && " +
                 "pip install --pre --retries 10 --upgrade tox --no-cache-dir"
           }
         }
@@ -3171,7 +3172,7 @@ class BeamModulePlugin implements Plugin<Project> {
 
           project.exec {
             executable 'sh'
-            args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 ${distTarBall}[${packages}]"
+            args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 --no-cache-dir ${distTarBall}[${packages}]"
           }
         }
       }
