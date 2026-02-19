@@ -138,7 +138,7 @@ tasks.register("yamlIntegrationTests") {
   doLast {
     exec {
       executable 'sh'
-      args '-c', "${envdir}/bin/pytest -v apache_beam/yaml/integration_tests.py"
+      args '-c', "${envdir}/bin/pytest -v --junitxml=${buildDir}/pytest-yaml-integration.xml apache_beam/yaml/integration_tests.py"
     }
   }
 }
