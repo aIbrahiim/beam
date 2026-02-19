@@ -169,11 +169,11 @@ ml_base = [
     'sentence-transformers>=2.2.2',
     'skl2onnx',
     'pyod',
-    'tensorflow',
+    'tensorflow>=2.12rc1,<2.21',
     'tensorflow-hub',
     'tf2onnx',
-    'torch',
-    'transformers',
+    'torch>=1.9.0,<2.8.0',
+    'transformers>=4.28.0,<4.56.0',
 ]
 
 
@@ -534,8 +534,8 @@ if __name__ == '__main__':
           # Optional dependencies to unit-test ML functionality.
           # We don't expect users to install this extra. Users should install
           # necessary dependencies individually, or we should create targeted
-          # extras. Keeping the bounds open as much as possible so that we
-          # can find out early when Beam doesn't work with new versions.
+          # extras. Keep key ML deps bounded to avoid resolver depth errors
+          # and align with the versions we test in other extras.
           'ml_test': [
               'datatable',
               # tensorflow-transform requires dill, but doesn't set dill as a
