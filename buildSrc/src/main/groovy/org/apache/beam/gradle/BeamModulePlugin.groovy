@@ -3163,6 +3163,10 @@ class BeamModulePlugin implements Plugin<Project> {
         dependsOn setupVirtualenv
         dependsOn ':sdks:python:sdist'
         doLast {
+          // #region agent log
+          def logFile = new File(project.rootProject.projectDir, 'debug-32b317.log')
+          logFile.append("{\"timestamp\":${System.currentTimeMillis()},\"message\":\"installGcpTest doLast started\",\"data\":{\"baseExtras\":\"\"},\"hypothesisId\":\"H1,H2\"}\n")
+          // #endregion
           def distTarBall = "${pythonRootDir}/build/apache-beam.tar.gz"
           def extra = project.findProperty('beamPythonExtra')
           def extraList = []
@@ -3174,16 +3178,37 @@ class BeamModulePlugin implements Plugin<Project> {
           }
           def nonMlExtras = extraList.findAll { !(it in mlExtras) }
           def baseExtras = (['gcp', 'test', 'aws', 'azure', 'dataframe'] + nonMlExtras).unique()
+          def constraintsFile = new File(pythonRootDir, 'constraints.txt')
+          def constraintArg = constraintsFile.exists() ? " --constraint ${constraintsFile.absolutePath}" : ""
 
-          project.exec {
-            executable 'sh'
-            args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 --no-cache-dir ${distTarBall}[${baseExtras.join(',')}]"
-          }
-          if (!mlExtras.isEmpty()) {
+          if (constraintsFile.exists()) {
             project.exec {
               executable 'sh'
-              args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 --no-cache-dir ${distTarBall}[${mlExtras.join(',')}]"
+              args '-c', ". ${project.ext.envdir}/bin/activate && pip install --no-cache-dir -c ${constraintsFile.absolutePath} googleapis-common-protos grpc-google-iam-v1 google-api-core"
             }
+          }
+
+          // #region agent log
+          logFile.append("{\"timestamp\":${System.currentTimeMillis()},\"message\":\"pip install base starting\",\"data\":{\"extras\":\"${baseExtras.join(',')}\"},\"hypothesisId\":\"H2\"}\n")
+          // #endregion
+          project.exec {
+            executable 'sh'
+            args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 --no-cache-dir${constraintArg} ${distTarBall}[${baseExtras.join(',')}]"
+          }
+          // #region agent log
+          logFile.append("{\"timestamp\":${System.currentTimeMillis()},\"message\":\"pip install base finished\",\"hypothesisId\":\"H2\"}\n")
+          // #endregion
+          if (!mlExtras.isEmpty()) {
+            // #region agent log
+            logFile.append("{\"timestamp\":${System.currentTimeMillis()},\"message\":\"pip install ml starting\",\"data\":{\"extras\":\"${mlExtras.join(',')}\"},\"hypothesisId\":\"H1,H2\"}\n")
+            // #endregion
+            project.exec {
+              executable 'sh'
+              args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 --no-cache-dir${constraintArg} ${distTarBall}[${mlExtras.join(',')}]"
+            }
+            // #region agent log
+            logFile.append("{\"timestamp\":${System.currentTimeMillis()},\"message\":\"pip install ml finished\",\"hypothesisId\":\"H1,H2\"}\n")
+            // #endregion
           }
         }
       }
