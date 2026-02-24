@@ -162,6 +162,7 @@ dataframe_dependency = [
 
 milvus_dependency = ['pymilvus>=2.5.10,<3.0.0']
 
+# namex/optree: keras transitive deps, constrain to help resolver
 ml_base = [
     'embeddings',
     'onnxruntime',
@@ -174,6 +175,8 @@ ml_base = [
     'tf2onnx',
     'torch',
     'transformers',
+    'namex>=0.0.9,<0.2.0',
+    'optree>=0.16.0,<0.19.0',
 ]
 
 
@@ -384,9 +387,8 @@ if __name__ == '__main__':
           'grpcio>=1.67.0; python_version >= "3.13"',
           'httplib2>=0.8,<0.32.0',
           'jsonpickle>=3.0.0,<4.0.0',
-          # numpy: py310-312 use 1.x; py313 needs 2.x (1.x unsupported; avoids  # pylint: disable=line-too-long
-          # pandas ABI mismatch).
-          'numpy>=1.26.0,<2.0.0; python_version < "3.13"',
+          # numpy: py313 needs 2.x (1.x unsupported). py<3.13: <2.5.0
+          'numpy>=1.26.0,<2.5.0; python_version < "3.13"',
           'numpy>=2.1.0; python_version >= "3.13"',
           'objsize>=0.6.1,<0.8.0',
           'packaging>=22.0',
@@ -542,9 +544,6 @@ if __name__ == '__main__':
               # tensorflow-transform requires dill, but doesn't set dill as a
               # hard requirement in setup.py.
               'dill',
-              # namex/optree: pin to avoid resolver issues (lack version bounds)  # pylint: disable=line-too-long
-              'namex==0.0.9',
-              'optree==0.16.0',
               'tensorflow-transform',
               # Comment out xgboost as it is breaking presubmit python ml
               # tests due to tag check introduced since pip 24.2
@@ -553,13 +552,8 @@ if __name__ == '__main__':
           ] + ml_base,
           'p312_ml_test': [
               'datatable',
-              'namex==0.0.9',
-              'optree==0.16.0',
           ] + ml_base,
-          'p313_ml_test': [
-              'namex==0.0.9',
-              'optree==0.16.0',
-          ] + ml_base,
+          'p313_ml_test': [] + ml_base,
           'aws': ['boto3>=1.9,<2'],
           'azure': [
               'azure-storage-blob>=12.3.2,<13',

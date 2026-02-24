@@ -3124,8 +3124,7 @@ class BeamModulePlugin implements Plugin<Project> {
             // Use pip 26.0.1 for improved resolution performance and bug fixes. See #34798.
             args '-c', ". ${project.ext.envdir}/bin/activate && " +
                 "pip install --pre --retries 10 --upgrade pip==26.0.1 --no-cache-dir && " +
-                "pip install --pre --retries 10 --upgrade tox --no-cache-dir && " +
-                "pip install uv"
+                "pip install --pre --retries 10 --upgrade tox --no-cache-dir"
           }
         }
         // Gradle will delete outputs whenever it thinks they are stale. Putting a
@@ -3175,11 +3174,8 @@ class BeamModulePlugin implements Plugin<Project> {
           def constraintFile = project.file(constraintsPath)
           def constraintFlag = constraintFile.exists() ? "--constraint ${constraintsPath}" : ""
 
-          // Use uv instead of pip - pip was hitting resolution-too-deep on tensorflow->keras->namex/optree.
-          // Include namex/optree as explicit deps to constrain resolution.
-          // --prerelease allow: envoy-data-plane depends on betterproto==2.0.0b6 (beta).
-          def anchorPkgs = "namex==0.0.9 optree==0.16.0"
-          def installCmd = ". ${project.ext.envdir}/bin/activate && uv pip install --prerelease allow ${constraintFlag} ${anchorPkgs} ${distTarBall}[${packages}]".replaceAll(/  +/, ' ').trim()
+          // --pre: envoy-data-plane depends on betterproto==2.0.0b6 (beta).
+          def installCmd = ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 ${constraintFlag} ${distTarBall}[${packages}]".replaceAll(/  +/, ' ').trim()
           project.exec {
             executable 'sh'
             args '-c', installCmd
