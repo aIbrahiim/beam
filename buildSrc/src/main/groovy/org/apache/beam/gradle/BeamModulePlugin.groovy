@@ -3174,8 +3174,11 @@ class BeamModulePlugin implements Plugin<Project> {
           def constraintFile = project.file(constraintsPath)
           def constraintFlag = constraintFile.exists() ? "--constraint ${constraintsPath}" : ""
 
-          // --pre: envoy-data-plane depends on betterproto==2.0.0b6 (beta).
-          def installCmd = ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 ${constraintFlag} ${distTarBall}[${packages}]".replaceAll(/  +/, ' ').trim()
+          // Pre-install betterproto (beta) separately so the main install
+          // can run without --pre, avoiding massive resolver backtracking.
+          def installCmd = ". ${project.ext.envdir}/bin/activate && " +
+              "pip install --pre betterproto && " +
+              "pip install --retries 10 ${constraintFlag} ${distTarBall}[${packages}]"
           project.exec {
             executable 'sh'
             args '-c', installCmd
