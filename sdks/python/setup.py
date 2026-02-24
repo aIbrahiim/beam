@@ -169,7 +169,7 @@ ml_base = [
     'sentence-transformers>=2.2.2',
     'skl2onnx',
     'pyod',
-    'tensorflow',
+    'tensorflow>=2.12.0',
     'tensorflow-hub',
     'tf2onnx',
     'torch',
