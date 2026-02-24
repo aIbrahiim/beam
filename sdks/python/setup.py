@@ -387,8 +387,8 @@ if __name__ == '__main__':
           'grpcio>=1.67.0; python_version >= "3.13"',
           'httplib2>=0.8,<0.32.0',
           'jsonpickle>=3.0.0,<4.0.0',
-          # numpy: py313 needs 2.x (1.x unsupported). py<3.13: <2.5.0
-          'numpy>=1.26.0,<2.5.0; python_version < "3.13"',
+          # numpy: py313 needs 2.x (1.x unsupported). py<3.13 needs <2.0 for pandas/C API compat.
+          'numpy>=1.26.0,<2.0.0; python_version < "3.13"',
           'numpy>=2.1.0; python_version >= "3.13"',
           'objsize>=0.6.1,<0.8.0',
           'packaging>=22.0',

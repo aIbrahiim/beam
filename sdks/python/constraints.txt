@@ -15,15 +15,22 @@
 # limitations under the License.
 #
 
-# Pins for installGcpTest. numpy in setup.py.
+# Constraints for installGcpTest to guide pip resolver.
+# These prevent excessive backtracking on transitive deps with wide version ranges.
+# numpy version bounds are in setup.py (Python version-specific).
+
+# Core API deps - pin to stable, tested versions
 googleapis-common-protos==1.72.0
-grpc-google-iam-v1>=0.12.4,<1.0.0
 google-api-core==2.29.0
+grpc-google-iam-v1>=0.12.4,<1.0.0
+
+# ML deps - ranges to constrain resolver while allowing minor updates
 namex>=0.0.9,<0.2.0
 optree>=0.16.0,<0.19.0
-# Transitive deps with wide ranges -- pin to prevent backtracking
-wrapt==2.1.1
-Werkzeug==3.1.5
-termcolor==2.5.0
-opt_einsum==3.4.0
-Markdown==3.10.2
+
+# Transitive deps with very wide ranges - pin to prevent deep backtracking
+wrapt>=1.16.0,<2.2.0
+Werkzeug>=2.0.0,<4.0.0
+termcolor>=2.0.0,<3.0.0
+opt_einsum>=3.3.0,<4.0.0
+Markdown>=3.3.0,<4.0.0
