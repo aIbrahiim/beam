@@ -538,7 +538,7 @@ if __name__ == '__main__':
           # extras. Keeping the bounds open as much as possible so that we
           # can find out early when Beam doesn't work with new versions.
           'ml_test': [
-              'datatable',
+              'datatable>=0.11.0,<0.12.0',
               # tensorflow-transform requires dill, but doesn't set dill as a
               # hard requirement in setup.py.
               'dill',
@@ -549,7 +549,7 @@ if __name__ == '__main__':
               # 'xgboost<2.0',  # https://github.com/apache/beam/issues/31252
           ] + ml_base + milvus_dependency,
           'p312_ml_test': [
-              'datatable',
+              'datatable>=0.11.0,<0.12.0',
           ] + ml_base,
           'p313_ml_test': ml_base,
           'aws': ['boto3>=1.9,<2'],
