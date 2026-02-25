@@ -542,7 +542,7 @@ if __name__ == '__main__':
               # tensorflow-transform requires dill, but doesn't set dill as a
               # hard requirement in setup.py.
               'dill',
-              'tensorflow-transform',
+              'tensorflow-transform>=1.14.0',
               # Comment out xgboost as it is breaking presubmit python ml
               # tests due to tag check introduced since pip 24.2
               # https://github.com/apache/beam/issues/31285
