@@ -549,6 +549,9 @@ if __name__ == '__main__':
               # Keep bounded ranges in tests to reduce resolver search space.
               'namex>=0.0.9,<0.2.0',
               'optree>=0.16.0,<0.19.0',
+              # Avoid fallback to old onnx source builds requiring cmake.
+              'tf2onnx>=1.16.1,<1.17.0',
+              'onnx>=1.14.0,<2.0.0',
               # Comment out xgboost as it is breaking presubmit python ml
               # tests due to tag check introduced since pip 24.2
               # https://github.com/apache/beam/issues/31285
