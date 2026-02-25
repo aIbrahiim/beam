@@ -542,7 +542,13 @@ if __name__ == '__main__':
               # tensorflow-transform requires dill, but doesn't set dill as a
               # hard requirement in setup.py.
               'dill',
-              'tensorflow-transform',
+              # Bound tensorflow-transform for tests to avoid expensive
+              # backtracking across historical releases in pip resolver.
+              'tensorflow-transform>=1.14.0,<1.15.0',
+              # keras deps are currently loosely constrained upstream.
+              # Keep bounded ranges in tests to reduce resolver search space.
+              'namex>=0.0.9,<0.2.0',
+              'optree>=0.16.0,<0.19.0',
               # Comment out xgboost as it is breaking presubmit python ml
               # tests due to tag check introduced since pip 24.2
               # https://github.com/apache/beam/issues/31285

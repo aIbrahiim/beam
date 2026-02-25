@@ -3171,7 +3171,7 @@ class BeamModulePlugin implements Plugin<Project> {
 
           project.exec {
             executable 'sh'
-            args '-c', ". ${project.ext.envdir}/bin/activate && pip install --pre --retries 10 ${distTarBall}[${packages}]"
+            args '-c', ". ${project.ext.envdir}/bin/activate && pip install --retries 10 ${distTarBall}[${packages}]"
           }
         }
       }
