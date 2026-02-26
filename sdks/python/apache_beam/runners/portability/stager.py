@@ -836,8 +836,13 @@ class Stager(object):
               os.path.dirname(setup_file),
           ]
           _LOGGER.info('Executing command: %s', build_setup_args)
-          processes.check_output(build_setup_args)
-        except RuntimeError:
+          # Capture both stdout and stderr from the build command for easier debugging.
+          processes.check_output(build_setup_args, stderr=processes.STDOUT)
+        except RuntimeError as exc:
+          _LOGGER.warning(
+              'Failed to build setup package using `python -m build` for %s: %s',
+              setup_file,
+              exc)
           if setup_file.endswith('setup.py'):
             build_setup_args = [
                 Stager._get_python_executable(),
@@ -847,7 +852,8 @@ class Stager(object):
                 temp_dir
             ]
             _LOGGER.info('Executing command: %s', build_setup_args)
-            processes.check_output(build_setup_args)
+            # Also capture stderr from legacy setup.py builds.
+            processes.check_output(build_setup_args, stderr=processes.STDOUT)
           else:
             # If it's pyproject.toml and `python -m build` failed,
             # there's no direct legacy fallback.

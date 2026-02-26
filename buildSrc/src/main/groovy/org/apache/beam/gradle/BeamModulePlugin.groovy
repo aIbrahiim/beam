@@ -3124,6 +3124,8 @@ class BeamModulePlugin implements Plugin<Project> {
             // pip 25.1 casues :sdks:python:installGcpTest stuck. Pin to 25.0.1 for now.
             args '-c', ". ${project.ext.envdir}/bin/activate && " +
                 "pip install --pre --retries 10 --upgrade pip==25.0.1 --no-cache-dir && " +
+                // Ensure packaging tooling is available for building example sdists (e.g. juliaset).
+                "pip install --pre --retries 10 --upgrade build setuptools wheel --no-cache-dir && " +
                 "pip install --pre --retries 10 --upgrade tox --no-cache-dir"
           }
         }
