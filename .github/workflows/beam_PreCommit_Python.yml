@@ -154,6 +154,7 @@ jobs:
           BEAM_CI_DUMP_DIR: ${{ github.workspace }}/beam-ci-stacktrace-dumps
           BEAM_CI_FAULT_INTERVAL_SEC: "300"
           BEAM_CI_PYSTACK_INTERVAL: "300"
+          BEAM_PYTEST_DISABLE_XDIST: ${{ matrix.python_version == '3.11' && '1' || '0' }}
           PYTHONFAULTHANDLER: "1"
           # Aggressive retry and timeout settings for flaky CI
           PYTEST_ADDOPTS: "-v --tb=short --maxfail=5 --durations=30 --reruns=5 --reruns-delay=15 --timeout=600 --disable-warnings"
