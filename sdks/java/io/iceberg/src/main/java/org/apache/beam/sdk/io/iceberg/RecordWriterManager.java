@@ -312,7 +312,8 @@ class RecordWriterManager implements AutoCloseable {
    *
    * <p>First attempts to fetch the table from the {@link #LAST_REFRESHED_TABLE_CACHE}. If it's not
    * there, we attempt to load it using the Iceberg API. If the table doesn't exist at all, we
-   * attempt to create it, inferring the table schema from the record schema.
+   * attempt to create it, using the destination create schema when available and otherwise
+   * inferring from the record schema.
    *
    * <p>Note that this is a best-effort operation that depends on the {@link Catalog}
    * implementation. Although it is expected, some implementations may not support creating a table
@@ -336,6 +337,10 @@ class RecordWriterManager implements AutoCloseable {
         createConfig != null && createConfig.getTableProperties() != null
             ? createConfig.getTableProperties()
             : Maps.newHashMap();
+    // Prefer the destination's declared create schema when available. Runtime row schemas can be
+    // normalized by runner/managed boundaries (e.g. logical type representation), while the
+    // destination schema reflects the intended table contract.
+    Schema createSchema = createConfig != null ? createConfig.getSchema() : dataSchema;
 
     @Nullable Table table = null;
     synchronized (LAST_REFRESHED_TABLE_CACHE) {
@@ -358,7 +363,8 @@ class RecordWriterManager implements AutoCloseable {
       try {
         table = catalog.loadTable(identifier);
       } catch (NoSuchTableException e) { // Otherwise, create the table
-        org.apache.iceberg.Schema tableSchema = IcebergUtils.beamSchemaToIcebergSchema(dataSchema);
+        org.apache.iceberg.Schema tableSchema =
+            IcebergUtils.beamSchemaToIcebergSchema(createSchema);
         try {
           table = catalog.createTable(identifier, tableSchema, partitionSpec, tableProperties);
           LOG.info(

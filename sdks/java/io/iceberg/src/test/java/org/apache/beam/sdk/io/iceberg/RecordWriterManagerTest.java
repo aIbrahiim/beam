@@ -28,10 +28,15 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -66,6 +71,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.InputFile;
@@ -1200,5 +1206,46 @@ public class RecordWriterManagerTest {
 
     // Verify that refresh() WAS called exactly once because the entry was stale.
     verify(mockTable, times(1)).refresh();
+  }
+
+  @Test
+  public void testGetOrCreateTable_usesDestinationCreateSchemaWhenProvided() {
+    Catalog mockCatalog = mock(Catalog.class);
+    Table mockTable = mock(Table.class);
+    TableIdentifier identifier = TableIdentifier.of("db", "table_with_date");
+    Schema destinationSchema = Schema.builder().addLogicalTypeField("date", SqlTypes.DATE).build();
+    Schema runtimeRowSchema = Schema.builder().addInt64Field("date").build();
+
+    IcebergDestination destination =
+        IcebergDestination.builder()
+            .setTableIdentifier(identifier)
+            .setFileFormat(FileFormat.PARQUET)
+            .setTableCreateConfig(
+                IcebergTableCreateConfig.builder()
+                    .setSchema(destinationSchema)
+                    .setPartitionFields(null)
+                    .build())
+            .build();
+
+    when(mockCatalog.loadTable(identifier)).thenThrow(new NoSuchTableException("missing"));
+    when(mockCatalog.createTable(
+            eq(identifier),
+            any(org.apache.iceberg.Schema.class),
+            any(PartitionSpec.class),
+            anyMap()))
+        .thenReturn(mockTable);
+
+    RecordWriterManager writer = new RecordWriterManager(mockCatalog, "p", 1L, 1);
+    RecordWriterManager.LAST_REFRESHED_TABLE_CACHE.invalidateAll();
+    writer.getOrCreateTable(destination, runtimeRowSchema);
+
+    org.apache.iceberg.Schema expectedSchema =
+        IcebergUtils.beamSchemaToIcebergSchema(destinationSchema);
+    verify(mockCatalog)
+        .createTable(
+            eq(identifier),
+            argThat(schema -> schema != null && schema.sameSchema(expectedSchema)),
+            any(PartitionSpec.class),
+            anyMap());
   }
 }
