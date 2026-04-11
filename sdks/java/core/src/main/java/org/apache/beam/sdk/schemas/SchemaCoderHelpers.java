@@ -20,6 +20,8 @@ package org.apache.beam.sdk.schemas;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -80,13 +82,42 @@ class SchemaCoderHelpers {
       this.isDateTime = logicalType.getBaseType().equals(FieldType.DATETIME);
     }
 
-    @Override
-    public void encode(InputT value, OutputStream outStream) throws CoderException, IOException {
+    /**
+     * {@link org.apache.beam.sdk.schemas.logicaltypes.UnknownLogicalType} (and other pass-through
+     * logical types with an INT64 representation) may leave {@link LocalDate} / {@link LocalTime}
+     * values unchanged in {@link LogicalType#toBaseType}, while the wire coder expects {@link
+     * Long}. Coerce so portable runners can encode rows built with standard SQL date/time
+     * semantics.
+     */
+    @SuppressWarnings("unchecked")
+    private BaseT coerceJavaTimeForInt64Wire(BaseT baseOrInput) {
+      if (!(baseTypeCoder instanceof VarLongCoder)) {
+        return baseOrInput;
+      }
+      if (!logicalType.getBaseType().equals(FieldType.INT64)) {
+        return baseOrInput;
+      }
+      Object v = baseOrInput;
+      if (v instanceof LocalDate) {
+        return (BaseT) (Long) ((LocalDate) v).toEpochDay();
+      }
+      if (v instanceof LocalTime) {
+        return (BaseT) (Long) ((LocalTime) v).toNanoOfDay();
+      }
+      return baseOrInput;
+    }
+
+    private BaseT toWireBaseType(InputT value) {
       BaseT baseType = logicalType.toBaseType(value);
       if (isDateTime) {
         baseType = (BaseT) ((ReadableInstant) baseType).toInstant();
       }
-      baseTypeCoder.encode(baseType, outStream);
+      return coerceJavaTimeForInt64Wire(baseType);
+    }
+
+    @Override
+    public void encode(InputT value, OutputStream outStream) throws CoderException, IOException {
+      baseTypeCoder.encode(toWireBaseType(value), outStream);
     }
 
     @Override
@@ -114,22 +145,23 @@ class SchemaCoderHelpers {
 
     @Override
     public Object structuralValue(InputT value) {
+      BaseT wireBase = toWireBaseType(value);
       if (baseTypeCoder.consistentWithEquals()) {
-        return logicalType.toBaseType(value);
+        return wireBase;
       } else {
-        return baseTypeCoder.structuralValue(logicalType.toBaseType(value));
+        return baseTypeCoder.structuralValue(wireBase);
       }
     }
 
     @Override
     public boolean isRegisterByteSizeObserverCheap(InputT value) {
-      return baseTypeCoder.isRegisterByteSizeObserverCheap(logicalType.toBaseType(value));
+      return baseTypeCoder.isRegisterByteSizeObserverCheap(toWireBaseType(value));
     }
 
     @Override
     public void registerByteSizeObserver(InputT value, ElementByteSizeObserver observer)
         throws Exception {
-      baseTypeCoder.registerByteSizeObserver(logicalType.toBaseType(value), observer);
+      baseTypeCoder.registerByteSizeObserver(toWireBaseType(value), observer);
     }
   }
 
