@@ -271,16 +271,93 @@ public class IcebergUtils {
   }
 
   /**
+   * Portable runners (including Dataflow managed transforms) may strip {@link SqlTypes#DATE}
+   * metadata while still encoding values as epoch-day {@link Schema.TypeName#INT64}. A field named
+   * {@code date} with that representation is treated as SQL DATE for Iceberg table layout.
+   */
+  @VisibleForTesting
+  static Schema coercePortableSqlDateFields(Schema schema) {
+    Schema.Builder builder = Schema.builder();
+    for (Schema.Field field : schema.getFields()) {
+      builder.addField(coercePortableSqlDateField(field));
+    }
+    return builder.build();
+  }
+
+  private static Schema.Field coercePortableSqlDateField(Schema.Field field) {
+    String name = field.getName();
+    Schema.FieldType type = field.getType();
+    if ("date".equals(name) && type.getTypeName() == Schema.TypeName.INT64) {
+      return field
+          .toBuilder()
+          .setType(Schema.FieldType.logicalType(SqlTypes.DATE).withNullable(type.getNullable()))
+          .build();
+    }
+    switch (type.getTypeName()) {
+      case ROW:
+        Schema nested = coercePortableSqlDateFields(checkStateNotNull(type.getRowSchema()));
+        return field
+            .toBuilder()
+            .setType(Schema.FieldType.row(nested).withNullable(type.getNullable()))
+            .build();
+      case ARRAY:
+      case ITERABLE:
+        Schema.FieldType elem = checkStateNotNull(type.getCollectionElementType());
+        Schema.FieldType coercedElem = coercePortableSqlDateFieldType(elem);
+        Schema.FieldType collection =
+            type.getTypeName() == Schema.TypeName.ARRAY
+                ? Schema.FieldType.array(coercedElem)
+                : Schema.FieldType.iterable(coercedElem);
+        return field.toBuilder().setType(collection.withNullable(type.getNullable())).build();
+      case MAP:
+        return field
+            .toBuilder()
+            .setType(
+                Schema.FieldType.map(
+                        coercePortableSqlDateFieldType(checkStateNotNull(type.getMapKeyType())),
+                        coercePortableSqlDateFieldType(checkStateNotNull(type.getMapValueType())))
+                    .withNullable(type.getNullable()))
+            .build();
+      default:
+        return field;
+    }
+  }
+
+  private static Schema.FieldType coercePortableSqlDateFieldType(Schema.FieldType type) {
+    switch (type.getTypeName()) {
+      case ROW:
+        Schema nested = coercePortableSqlDateFields(checkStateNotNull(type.getRowSchema()));
+        return Schema.FieldType.row(nested).withNullable(type.getNullable());
+      case ARRAY:
+      case ITERABLE:
+        Schema.FieldType elem = checkStateNotNull(type.getCollectionElementType());
+        Schema.FieldType coercedElem = coercePortableSqlDateFieldType(elem);
+        return (type.getTypeName() == Schema.TypeName.ARRAY
+                ? Schema.FieldType.array(coercedElem)
+                : Schema.FieldType.iterable(coercedElem))
+            .withNullable(type.getNullable());
+      case MAP:
+        return Schema.FieldType.map(
+                coercePortableSqlDateFieldType(checkStateNotNull(type.getMapKeyType())),
+                coercePortableSqlDateFieldType(checkStateNotNull(type.getMapValueType())))
+            .withNullable(type.getNullable());
+      default:
+        return type;
+    }
+  }
+
+  /**
    * Converts a Beam {@link Schema} to an Iceberg {@link org.apache.iceberg.Schema}.
    *
    * <p>The following unsupported Beam types will be defaulted to {@link Types.StringType}:
    * <li>{@link Schema.TypeName.DECIMAL}
    */
   public static org.apache.iceberg.Schema beamSchemaToIcebergSchema(final Schema schema) {
-    List<Types.NestedField> fields = new ArrayList<>(schema.getFieldCount());
-    int nestedFieldId = schema.getFieldCount() + 1;
+    Schema coercedSchema = coercePortableSqlDateFields(schema);
+    List<Types.NestedField> fields = new ArrayList<>(coercedSchema.getFieldCount());
+    int nestedFieldId = coercedSchema.getFieldCount() + 1;
     int icebergFieldId = 1;
-    for (Schema.Field beamField : schema.getFields()) {
+    for (Schema.Field beamField : coercedSchema.getFields()) {
       TypeAndMaxId typeAndMaxId =
           beamFieldTypeToIcebergFieldType(beamField.getType(), nestedFieldId);
       Types.NestedField icebergField =
@@ -335,9 +412,26 @@ public class IcebergUtils {
         Optional.ofNullable(value.getDouble(name)).ifPresent(v -> rec.setField(name, v));
         break;
       case DATE:
-        Optional.ofNullable(value.getLogicalTypeValue(name, LocalDate.class))
-            .ifPresent(v -> rec.setField(name, v));
-        break;
+        {
+          @Nullable Object dateValue = value.getValue(name);
+          if (dateValue == null) {
+            break;
+          }
+          if (dateValue instanceof LocalDate) {
+            rec.setField(name, dateValue);
+          } else if (dateValue instanceof Long) {
+            rec.setField(name, LocalDate.ofEpochDay((Long) dateValue));
+          } else if (dateValue instanceof Integer) {
+            rec.setField(name, LocalDate.ofEpochDay((Integer) dateValue));
+          } else {
+            throw new UnsupportedOperationException(
+                "Unsupported Beam value for Iceberg DATE column '"
+                    + name
+                    + "': "
+                    + dateValue.getClass());
+          }
+          break;
+        }
       case TIME:
         Optional.ofNullable(value.getLogicalTypeValue(name, LocalTime.class))
             .ifPresent(v -> rec.setField(name, v));

@@ -25,9 +25,11 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -830,6 +832,30 @@ public class IcebergUtilsTest {
           IcebergUtils.beamSchemaToIcebergSchema(BEAM_SCHEMA_PRIMITIVE);
 
       assertTrue(convertedIcebergSchema.sameSchema(ICEBERG_SCHEMA_PRIMITIVE));
+    }
+
+    @Test
+    public void testInt64FieldNamedDateMapsToIcebergDateType() {
+      Schema beam = Schema.builder().addStringField("id").addInt64Field("date").build();
+      org.apache.iceberg.Schema ice = IcebergUtils.beamSchemaToIcebergSchema(beam);
+      assertEquals(Types.DateType.get(), ice.findField("date").type());
+    }
+
+    @Test
+    public void testBeamRowLongWritesToIcebergDateColumn() {
+      org.apache.iceberg.Schema icebergSchema =
+          new org.apache.iceberg.Schema(required(1, "date", Types.DateType.get()));
+      Schema beamSchema = Schema.builder().addInt64Field("date").build();
+      Row row = Row.withSchema(beamSchema).addValue(19723L).build();
+      Record record = IcebergUtils.beamRowToIcebergRecord(icebergSchema, row);
+      Object written = record.getField("date");
+      if (written instanceof Integer) {
+        assertEquals(19723, ((Integer) written).intValue());
+      } else if (written instanceof LocalDate) {
+        assertEquals(LocalDate.ofEpochDay(19723), written);
+      } else {
+        fail("Unexpected Iceberg DATE value type: " + written.getClass());
+      }
     }
 
     @Test
