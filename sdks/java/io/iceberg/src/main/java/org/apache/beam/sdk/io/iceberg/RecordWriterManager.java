@@ -312,7 +312,9 @@ class RecordWriterManager implements AutoCloseable {
    *
    * <p>First attempts to fetch the table from the {@link #LAST_REFRESHED_TABLE_CACHE}. If it's not
    * there, we attempt to load it using the Iceberg API. If the table doesn't exist at all, we
-   * attempt to create it, inferring the table schema from the record schema.
+   * attempt to create it using the provided Beam {@code dataSchema} (for dynamic writes this should
+   * be the {@link IcebergTableCreateConfig} schema when available, not only {@link
+   * Row#getSchema()}).
    *
    * <p>Note that this is a best-effort operation that depends on the {@link Catalog}
    * implementation. Although it is expected, some implementations may not support creating a table
@@ -392,7 +394,16 @@ class RecordWriterManager implements AutoCloseable {
             icebergDestination,
             destination -> {
               IcebergDestination dest = destination.getValue();
-              Table table = getOrCreateTable(dest, row.getSchema());
+              // Prefer the schema from table creation config (from DynamicDestinations) over
+              // row.getSchema(). Runners may round-trip row schemas through a portable encoding
+              // that drops some logical types (e.g. SqlTypes.DATE -> INT64) while the config schema
+              // still carries the full logical types from pipeline construction.
+              Schema tableCreationSchema = row.getSchema();
+              @Nullable IcebergTableCreateConfig createConfig = dest.getTableCreateConfig();
+              if (createConfig != null) {
+                tableCreationSchema = createConfig.getSchema();
+              }
+              Table table = getOrCreateTable(dest, tableCreationSchema);
               return new DestinationState(dest, table);
             });
 

@@ -335,9 +335,28 @@ public class IcebergUtils {
         Optional.ofNullable(value.getDouble(name)).ifPresent(v -> rec.setField(name, v));
         break;
       case DATE:
-        Optional.ofNullable(value.getLogicalTypeValue(name, LocalDate.class))
-            .ifPresent(v -> rec.setField(name, v));
-        break;
+        {
+          @Nullable LocalDate dateValue = value.getLogicalTypeValue(name, LocalDate.class);
+          if (dateValue == null) {
+            Schema.Field beamField = value.getSchema().getField(name);
+            if (beamField != null) {
+              Schema.FieldType beamType = beamField.getType();
+              if (beamType.getTypeName() == Schema.TypeName.INT64) {
+                @Nullable Long epochDay = value.getInt64(name);
+                if (epochDay != null) {
+                  dateValue = LocalDate.ofEpochDay(epochDay);
+                }
+              } else if (beamType.getTypeName() == Schema.TypeName.INT32) {
+                @Nullable Integer days = value.getInt32(name);
+                if (days != null) {
+                  dateValue = DateTimeUtil.dateFromDays(days);
+                }
+              }
+            }
+          }
+          Optional.ofNullable(dateValue).ifPresent(v -> rec.setField(name, v));
+          break;
+        }
       case TIME:
         Optional.ofNullable(value.getLogicalTypeValue(name, LocalTime.class))
             .ifPresent(v -> rec.setField(name, v));
