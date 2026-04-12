@@ -89,12 +89,27 @@ class SchemaCoderHelpers {
      * Long}. Coerce so portable runners can encode rows built with standard SQL date/time
      * semantics.
      */
+    /**
+     * {@link #coderForFieldType} wraps nullable primitives in {@link NullableCoder}. Logical types
+     * whose base is nullable {@code INT64} therefore use {@code NullableCoder(VarLongCoder)} on the
+     * wire, and we must still coerce {@link LocalDate} / {@link LocalTime} to {@link Long}.
+     */
+    private static boolean unwrapsToVarLongCoder(Coder<?> coder) {
+      Coder<?> current = coder;
+      while (current instanceof NullableCoder) {
+        current = ((NullableCoder<?>) current).getValueCoder();
+      }
+      return current instanceof VarLongCoder;
+    }
+
     @SuppressWarnings("unchecked")
     private BaseT coerceJavaTimeForInt64Wire(BaseT baseOrInput) {
-      if (!(baseTypeCoder instanceof VarLongCoder)) {
+      if (!unwrapsToVarLongCoder(baseTypeCoder)) {
         return baseOrInput;
       }
-      if (!logicalType.getBaseType().equals(FieldType.INT64)) {
+      // Use TypeName, not FieldType.equals(INT64): nullable INT64 base (e.g. FieldType.INT64
+      // with nullable=true) must still coerce LocalDate/LocalTime for VarLongCoder.
+      if (logicalType.getBaseType().getTypeName() != TypeName.INT64) {
         return baseOrInput;
       }
       Object v = baseOrInput;

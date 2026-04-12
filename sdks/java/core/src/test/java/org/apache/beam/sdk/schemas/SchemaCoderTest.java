@@ -22,16 +22,20 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 
 import com.google.auto.value.AutoValue;
+import java.io.ByteArrayOutputStream;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.function.Supplier;
+import org.apache.beam.sdk.coders.Coder;
 import org.apache.beam.sdk.coders.Coder.NonDeterministicException;
 import org.apache.beam.sdk.coders.RowCoder;
 import org.apache.beam.sdk.schemas.Schema.Field;
 import org.apache.beam.sdk.schemas.Schema.FieldType;
 import org.apache.beam.sdk.schemas.annotations.DefaultSchema;
 import org.apache.beam.sdk.schemas.logicaltypes.NanosInstant;
+import org.apache.beam.sdk.schemas.logicaltypes.UnknownLogicalType;
 import org.apache.beam.sdk.schemas.utils.SchemaTestUtils;
 import org.apache.beam.sdk.testing.CoderProperties;
 import org.apache.beam.sdk.values.Row;
@@ -62,6 +66,32 @@ public class SchemaCoderTest {
 
   @RunWith(JUnit4.class)
   public static class SingletonTests {
+    /**
+     * When a logical type's base is nullable INT64, the wire coder is NullableCoder(VarLongCoder).
+     * Pass-through logical types may still hold LocalDate in memory; encoding must coerce to Long
+     * (see BEAM issue: Iceberg / portable runners ClassCastException on encode).
+     */
+    @Test
+    public void logicalType_nullableInt64Base_coercesLocalDateForEncodeAndByteSize()
+        throws Exception {
+      Schema schema =
+          Schema.of(
+              Field.of(
+                  "d",
+                  FieldType.logicalType(
+                      new UnknownLogicalType<LocalDate>(
+                          "beam:test:nullable_int64_date:v1",
+                          new byte[0],
+                          FieldType.STRING,
+                          "",
+                          FieldType.INT64.withNullable(true)))));
+      RowCoder coder = RowCoder.of(schema);
+      Row row = Row.withSchema(schema).withFieldValue("d", LocalDate.of(1970, 1, 1)).build();
+      Coder.getEncodedElementByteSizeUsingCoder(coder, row);
+      ByteArrayOutputStream out = new ByteArrayOutputStream();
+      coder.encode(row, out);
+    }
+
     @Test
     public void equals_sameSchemaDifferentType_returnsFalse() throws NoSuchSchemaException {
       SchemaCoder autovalueCoder = coderFrom(TypeDescriptor.of(SimpleAutoValue.class));
