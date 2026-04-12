@@ -234,9 +234,15 @@ def run(
     method = beam.io.WriteToBigQuery.Method.STREAMING_INSERTS
     pipeline_options.view_as(StandardOptions).streaming = True
 
+  # Use from_pretrained so the config includes all fields (e.g. pruned_heads)
+  # expected by the Transformers modeling code. A bare DistilBertConfig(num_labels=2)
+  # can break when the worker mixes site-packages and beam-venv Transformers versions
+  # (e.g. Dataflow GPU sdk_container_image + requirements_file).
+  sentiment_config = DistilBertConfig.from_pretrained(
+      known_args.model_path, num_labels=2)
   model_handler = PytorchModelHandlerKeyedTensor(
       model_class=DistilBertForSequenceClassification,
-      model_params={'config': DistilBertConfig(num_labels=2)},
+      model_params={'config': sentiment_config},
       state_dict_path=known_args.model_state_dict_path,
       device='GPU')
 

@@ -19,6 +19,14 @@ on:
   schedule:
     - cron: '50 3 * * *'
   workflow_dispatch:
+    inputs:
+      pytorch_sentiment_benchmarks_only:
+        description: >
+          If true, run only the two PyTorch DistilBERT sentiment Dataflow benchmarks
+          (skips VLLM, vision, language modeling, and table row jobs). Ignored for schedule.
+        required: false
+        type: boolean
+        default: false
 
 #Setting explicit permissions for the action to avoid the default permissions which are `write-all` in case of pull_request_target event
 permissions:
@@ -77,6 +85,7 @@ jobs:
       - name: Package Python SDK using Gradle
         run: ./gradlew :sdks:python:sdist -PpythonVersion=3.10
       - name: Configure Docker for Artifact Registry
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         run: gcloud auth configure-docker us-docker.pkg.dev
       - name: Prepare test arguments
         uses: ./.github/actions/test-arguments-action
@@ -99,12 +108,14 @@ jobs:
         run: echo "NOW_UTC=$(date '+%m%d%H%M%S' --utc)" >> $GITHUB_ENV
       - name: Build VLLM Development Image
         id: build_vllm_image
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/build-push-docker-action
         with:
           dockerfile_path: 'sdks/python/apache_beam/ml/inference/test_resources/vllm.dockerfile'
           image_name: 'us-docker.pkg.dev/apache-beam-testing/beam-temp/beam-vllm-gpu-base'
           image_tag: ${{ github.sha }}
       - name: Run VLLM Gemma Batch Test
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -138,6 +149,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_7 }} --mode=batch --job_name=benchmark-tests-pytorch-sentiment-distilbert-base-uncased-batch-${{env.NOW_UTC}} --output_table=apache-beam-testing.beam_run_inference.result_sentiment_distilbert_base_uncased' \
       - name: run Pytorch Vision Classification with Resnet 101
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -149,6 +161,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_1 }} --job_name=benchmark-tests-pytorch-imagenet-python-101-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet101-${{env.NOW_UTC}}.txt' \
       - name: run Pytorch Imagenet Classification with Resnet 152
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -160,6 +173,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_2 }} --job_name=benchmark-tests-pytorch-imagenet-python-152-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet152-${{env.NOW_UTC}}.txt' \
       - name: run Pytorch Language Modeling using Hugging Face bert-base-uncased model
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -171,6 +185,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_3 }} --job_name=benchmark-tests-pytorch-language-modeling-bert-base-uncased-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_bert_base_uncased-${{env.NOW_UTC}}.txt' \
       - name: run Pytorch Langauge Modeling using Hugging Face bert-large-uncased model
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -182,6 +197,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_4 }} --job_name=benchmark-tests-pytorch-language-modeling-bert-large-uncased-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_bert_large_uncased-${{env.NOW_UTC}}.txt' \
       - name: run Pytorch Imagenet Classification with Resnet 152 with Tesla T4 GPU
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -193,6 +209,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_5 }} --job_name=benchmark-tests-pytorch-imagenet-python-gpu-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet152_gpu-${{env.NOW_UTC}}.txt'
       - name: run Table Row Inference Sklearn Batch
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -204,6 +221,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/table_row_inference_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_9 }} --autoscaling_algorithm=NONE --metrics_table=result_table_row_inference_batch --influx_measurement=result_table_row_inference_batch --mode=batch --input_file=gs://apache-beam-ml/testing/inputs/table_rows_100k_benchmark.jsonl --input_expand_factor=100 --output_table=apache-beam-testing:beam_run_inference.result_table_row_inference_batch_outputs --job_name=benchmark-tests-table-row-inference-batch-${{env.NOW_UTC}}'
       - name: run Table Row Inference Sklearn Stream
+        if: ${{ github.event_name == 'schedule' || github.event.inputs.pytorch_sentiment_benchmarks_only != true }}
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
