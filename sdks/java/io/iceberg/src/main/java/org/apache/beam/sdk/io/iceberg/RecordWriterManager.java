@@ -400,7 +400,7 @@ class RecordWriterManager implements AutoCloseable {
               // still carries the full logical types from pipeline construction.
               Schema tableCreationSchema = row.getSchema();
               @Nullable IcebergTableCreateConfig createConfig = dest.getTableCreateConfig();
-              if (createConfig != null) {
+              if (createConfig != null && createConfig.getSchema() != null) {
                 tableCreationSchema = createConfig.getSchema();
               }
               Table table = getOrCreateTable(dest, tableCreationSchema);

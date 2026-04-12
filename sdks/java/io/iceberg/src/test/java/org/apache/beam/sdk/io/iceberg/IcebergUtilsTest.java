@@ -1085,5 +1085,12 @@ public class IcebergUtilsTest {
       assertEquals(
           Schema.FieldType.logicalType(SqlTypes.DATE), innerRestored.getField("date").getType());
     }
+
+    @Test
+    public void testBeamSchemaToIcebergSchemaPromotesBareInt64NamedDate() {
+      Schema stripped = Schema.builder().addInt64Field("date").build();
+      org.apache.iceberg.Schema iceberg = IcebergUtils.beamSchemaToIcebergSchema(stripped);
+      assertEquals(Types.DateType.get(), iceberg.findField("date").type());
+    }
   }
 }

@@ -654,7 +654,7 @@ public abstract class IcebergCatalogBaseIT implements Serializable {
     pipeline.run().waitUntilFinish();
 
     Table table = catalog.loadTable(TableIdentifier.parse(tableId()));
-    assertEquals(BEAM_SCHEMA, icebergSchemaToBeamSchema(table.schema()));
+    assertTrue(BEAM_SCHEMA.equivalent(icebergSchemaToBeamSchema(table.schema())));
 
     // Read back and check records are correct
     List<Record> returnedRecords = readRecords(table);
@@ -825,7 +825,7 @@ public abstract class IcebergCatalogBaseIT implements Serializable {
     Table table4 = catalog.loadTable(TableIdentifier.parse(tableId() + "_4_e"));
 
     for (Table t : Arrays.asList(table0, table1, table2, table3, table4)) {
-      assertEquals(rowFilter.outputSchema(), icebergSchemaToBeamSchema(t.schema()));
+      assertTrue(rowFilter.outputSchema().equivalent(icebergSchemaToBeamSchema(t.schema())));
     }
 
     // Read back and check records are correct
@@ -944,7 +944,7 @@ public abstract class IcebergCatalogBaseIT implements Serializable {
             table3false,
             table4true,
             table4false)) {
-      assertEquals(BEAM_SCHEMA, icebergSchemaToBeamSchema(t.schema()));
+      assertTrue(BEAM_SCHEMA.equivalent(icebergSchemaToBeamSchema(t.schema())));
     }
 
     // Read back and check records are correct

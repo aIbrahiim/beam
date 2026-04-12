@@ -329,14 +329,19 @@ public class IcebergUtils {
   /**
    * Converts a Beam {@link Schema} to an Iceberg {@link org.apache.iceberg.Schema}.
    *
+   * <p>Applies {@link #restorePortableDroppedSqlDateTimeTypes} first so bare {@code INT64} fields
+   * named {@code date} / {@code time} (as seen after portable runner round-trips) map to Iceberg
+   * date/time types instead of longs.
+   *
    * <p>The following unsupported Beam types will be defaulted to {@link Types.StringType}:
    * <li>{@link Schema.TypeName.DECIMAL}
    */
   public static org.apache.iceberg.Schema beamSchemaToIcebergSchema(final Schema schema) {
-    List<Types.NestedField> fields = new ArrayList<>(schema.getFieldCount());
-    int nestedFieldId = schema.getFieldCount() + 1;
+    Schema normalized = restorePortableDroppedSqlDateTimeTypes(schema);
+    List<Types.NestedField> fields = new ArrayList<>(normalized.getFieldCount());
+    int nestedFieldId = normalized.getFieldCount() + 1;
     int icebergFieldId = 1;
-    for (Schema.Field beamField : schema.getFields()) {
+    for (Schema.Field beamField : normalized.getFields()) {
       TypeAndMaxId typeAndMaxId =
           beamFieldTypeToIcebergFieldType(beamField.getType(), nestedFieldId);
       Types.NestedField icebergField =
