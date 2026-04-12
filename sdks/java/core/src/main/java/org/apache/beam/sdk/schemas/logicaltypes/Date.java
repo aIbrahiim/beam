@@ -39,6 +39,14 @@ public class Date implements Schema.LogicalType<LocalDate, Long> {
           .getOptions()
           .getExtension(RunnerApi.beamUrn);
 
+  /**
+   * Used when deserializing {@link Date} from a portable schema proto that included a (legacy)
+   * string argument (same pattern as {@link Time#of(String)}).
+   */
+  public static Date of(@SuppressWarnings("unused") String ignored) {
+    return new Date();
+  }
+
   @Override
   public String getIdentifier() {
     return IDENTIFIER;

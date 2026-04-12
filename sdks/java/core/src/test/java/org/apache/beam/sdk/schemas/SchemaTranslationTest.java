@@ -41,6 +41,7 @@ import org.apache.beam.model.pipeline.v1.SchemaApi.FieldValue;
 import org.apache.beam.model.pipeline.v1.SchemaApi.LogicalType;
 import org.apache.beam.sdk.schemas.Schema.Field;
 import org.apache.beam.sdk.schemas.Schema.FieldType;
+import org.apache.beam.sdk.schemas.logicaltypes.Date;
 import org.apache.beam.sdk.schemas.logicaltypes.DateTime;
 import org.apache.beam.sdk.schemas.logicaltypes.FixedBytes;
 import org.apache.beam.sdk.schemas.logicaltypes.FixedPrecisionNumeric;
@@ -523,6 +524,40 @@ public class SchemaTranslationTest {
                         .toLowerCase()
                         .replaceAll("[^0-9A-Za-z_]", ""))));
       }
+    }
+  }
+
+  /**
+   * Portable schema protos sometimes carry an empty STRING argument for {@link SqlTypes#DATE}
+   * (legacy); {@link SchemaTranslation} must recover via {@link Date#of(String)} like {@link
+   * org.apache.beam.sdk.schemas.logicaltypes.Time}.
+   */
+  @RunWith(JUnit4.class)
+  public static class LegacyDateLogicalTypeArgumentTest {
+
+    @Test
+    public void testDateWithLegacyEmptyStringArgument() {
+      SchemaApi.FieldType proto =
+          SchemaApi.FieldType.newBuilder()
+              .setLogicalType(
+                  LogicalType.newBuilder()
+                      .setUrn(Date.IDENTIFIER)
+                      .setRepresentation(
+                          SchemaApi.FieldType.newBuilder()
+                              .setAtomicType(SchemaApi.AtomicType.INT64))
+                      .setArgumentType(
+                          SchemaApi.FieldType.newBuilder()
+                              .setAtomicType(SchemaApi.AtomicType.STRING))
+                      .setArgument(
+                          FieldValue.newBuilder()
+                              .setAtomicValue(AtomicTypeValue.newBuilder().setString("").build())
+                              .build())
+                      .build())
+              .build();
+
+      Schema.FieldType translated = SchemaTranslation.fieldTypeFromProto(proto);
+      assertThat(translated.getTypeName(), equalTo(Schema.TypeName.LOGICAL_TYPE));
+      assertThat(translated.getLogicalType().getIdentifier(), equalTo(Date.IDENTIFIER));
     }
   }
 
