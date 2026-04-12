@@ -32,5 +32,6 @@
 --input_file=gs://apache-beam-ml/testing/inputs/sentences_50k.txt
 --runner=DataflowRunner
 --experiments=worker_accelerator=type:nvidia-tesla-t4;count:1;install-nvidia-driver:5xx
+--sdk_container_image=us.gcr.io/apache-beam-testing/python-postcommit-it/tensor_rt:latest
 --model_path=distilbert-base-uncased-finetuned-sst-2-english
 --model_state_dict_path=gs://apache-beam-ml/models/huggingface.sentiment.distilbert-base-uncased.pth
