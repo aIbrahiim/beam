@@ -138,6 +138,62 @@ public class IcebergUtils {
     return builder.build();
   }
 
+  /**
+   * Re-attaches {@link SqlTypes#DATE} / {@link SqlTypes#TIME} to fields that were widened to plain
+   * {@link Schema.TypeName#INT64} on the portable pipeline path (for example Dataflow's managed
+   * Iceberg write), so that {@link #beamSchemaToIcebergSchema} maps them to Iceberg date/time types
+   * instead of longs.
+   *
+   * <p>Promotion uses the SQL-oriented field names {@code date} and {@code time} together with a
+   * bare {@code INT64} type (no logical type). Other {@code INT64} columns are unchanged. Nested
+   * {@link Schema.TypeName#ROW}, collection, and map types are processed recursively.
+   */
+  public static Schema restorePortableDroppedSqlDateTimeTypes(Schema schema) {
+    List<Schema.Field> fields = new ArrayList<>(schema.getFieldCount());
+    for (Schema.Field field : schema.getFields()) {
+      Schema.FieldType restoredType = restoreFieldType(field.getName(), field.getType());
+      fields.add(field.toBuilder().setType(restoredType).build());
+    }
+    return Schema.builder().addFields(fields).build();
+  }
+
+  private static Schema.FieldType restoreFieldType(String fieldName, Schema.FieldType type) {
+    Schema.TypeName typeName = type.getTypeName();
+    if (typeName.isCompositeType()) {
+      Schema nestedSchema = checkArgumentNotNull(type.getRowSchema());
+      return Schema.FieldType.row(restorePortableDroppedSqlDateTimeTypes(nestedSchema))
+          .withNullable(type.getNullable());
+    }
+    if (typeName.isCollectionType()) {
+      Schema.FieldType elementType = checkArgumentNotNull(type.getCollectionElementType());
+      Schema.FieldType restoredElement = restoreFieldType(/* element */ "", elementType);
+      if (typeName == Schema.TypeName.ARRAY) {
+        return Schema.FieldType.array(restoredElement).withNullable(type.getNullable());
+      }
+      return Schema.FieldType.iterable(restoredElement).withNullable(type.getNullable());
+    }
+    if (typeName.isMapType()) {
+      Schema.FieldType keyType = checkArgumentNotNull(type.getMapKeyType());
+      Schema.FieldType valueType = checkArgumentNotNull(type.getMapValueType());
+      return Schema.FieldType.map(restoreFieldType("", keyType), restoreFieldType("", valueType))
+          .withNullable(type.getNullable());
+    }
+    return promoteBareInt64ToSqlDateTime(fieldName, type);
+  }
+
+  private static Schema.FieldType promoteBareInt64ToSqlDateTime(
+      String fieldName, Schema.FieldType type) {
+    if (type.getTypeName() == Schema.TypeName.INT64 && type.getLogicalType() == null) {
+      if ("date".equals(fieldName)) {
+        return Schema.FieldType.logicalType(SqlTypes.DATE).withNullable(type.getNullable());
+      }
+      if ("time".equals(fieldName)) {
+        return Schema.FieldType.logicalType(SqlTypes.TIME).withNullable(type.getNullable());
+      }
+    }
+    return type;
+  }
+
   private static Schema icebergStructTypeToBeamSchema(final Types.StructType struct) {
     Schema.Builder builder = Schema.builder();
     for (Types.NestedField f : struct.fields()) {
@@ -336,31 +392,47 @@ public class IcebergUtils {
         break;
       case DATE:
         {
-          @Nullable LocalDate dateValue = value.getLogicalTypeValue(name, LocalDate.class);
-          if (dateValue == null) {
-            Schema.Field beamField = value.getSchema().getField(name);
-            if (beamField != null) {
-              Schema.FieldType beamType = beamField.getType();
-              if (beamType.getTypeName() == Schema.TypeName.INT64) {
-                @Nullable Long epochDay = value.getInt64(name);
-                if (epochDay != null) {
-                  dateValue = LocalDate.ofEpochDay(epochDay);
-                }
-              } else if (beamType.getTypeName() == Schema.TypeName.INT32) {
-                @Nullable Integer days = value.getInt32(name);
-                if (days != null) {
-                  dateValue = DateTimeUtil.dateFromDays(days);
-                }
+          @Nullable LocalDate dateValue = null;
+          Schema.Field beamField = value.getSchema().getField(name);
+          if (beamField != null) {
+            Schema.FieldType beamType = beamField.getType();
+            if (beamType.getTypeName() == Schema.TypeName.INT64) {
+              @Nullable Long epochDay = value.getInt64(name);
+              if (epochDay != null) {
+                dateValue = LocalDate.ofEpochDay(epochDay);
+              }
+            } else if (beamType.getTypeName() == Schema.TypeName.INT32) {
+              @Nullable Integer days = value.getInt32(name);
+              if (days != null) {
+                dateValue = DateTimeUtil.dateFromDays(days);
               }
             }
+          }
+          if (dateValue == null) {
+            dateValue = value.getLogicalTypeValue(name, LocalDate.class);
           }
           Optional.ofNullable(dateValue).ifPresent(v -> rec.setField(name, v));
           break;
         }
       case TIME:
-        Optional.ofNullable(value.getLogicalTypeValue(name, LocalTime.class))
-            .ifPresent(v -> rec.setField(name, v));
-        break;
+        {
+          @Nullable LocalTime timeValue = null;
+          Schema.Field beamField = value.getSchema().getField(name);
+          if (beamField != null) {
+            Schema.FieldType beamType = beamField.getType();
+            if (beamType.getTypeName() == Schema.TypeName.INT64) {
+              @Nullable Long nanoOfDay = value.getInt64(name);
+              if (nanoOfDay != null) {
+                timeValue = LocalTime.ofNanoOfDay(nanoOfDay);
+              }
+            }
+          }
+          if (timeValue == null) {
+            timeValue = value.getLogicalTypeValue(name, LocalTime.class);
+          }
+          Optional.ofNullable(timeValue).ifPresent(v -> rec.setField(name, v));
+          break;
+        }
       case TIMESTAMP:
         Object val = value.getValue(name);
         if (val == null) {

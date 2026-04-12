@@ -45,10 +45,11 @@ class PortableIcebergDestinations implements DynamicDestinations {
       @Nullable List<String> fieldsToDrop,
       @Nullable List<String> fieldsToKeep,
       @Nullable String onlyField) {
-    this.interpolator = new RowStringInterpolator(destinationTemplate, inputSchema);
+    Schema schemaForWrite = IcebergUtils.restorePortableDroppedSqlDateTimeTypes(inputSchema);
+    this.interpolator = new RowStringInterpolator(destinationTemplate, schemaForWrite);
     this.partitionFields = partitionFields;
     this.tableProperties = tableProperties;
-    RowFilter rf = new RowFilter(inputSchema);
+    RowFilter rf = new RowFilter(schemaForWrite);
 
     if (fieldsToDrop != null) {
       rf = rf.drop(fieldsToDrop);

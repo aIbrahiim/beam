@@ -28,7 +28,9 @@ import static org.junit.Assert.assertTrue;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -127,6 +129,19 @@ public class IcebergUtilsTest {
           Schema.FieldType.logicalType(SqlTypes.TIME),
           Types.TimeType.get(),
           DateTimeUtil.timeFromMicros(12345678L));
+    }
+
+    @Test
+    public void testDateAsBareInt64EpochDay() {
+      checkRowValueToRecordValue(
+          Schema.FieldType.INT64, 0L, Types.DateType.get(), LocalDate.ofEpochDay(0));
+    }
+
+    @Test
+    public void testTimeAsBareInt64NanoOfDay() {
+      LocalTime expected = LocalTime.of(12, 34, 56);
+      checkRowValueToRecordValue(
+          Schema.FieldType.INT64, expected.toNanoOfDay(), Types.TimeType.get(), expected);
     }
 
     @Test
@@ -1039,6 +1054,36 @@ public class IcebergUtilsTest {
           IcebergUtils.beamSchemaToIcebergSchema(BEAM_SCHEMA_JDBC_ALL_TYPES);
 
       assertTrue(convertedIcebergSchema.sameSchema(ICEBERG_SCHEMA_JDBC_ALL_TYPES));
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class RestorePortableDroppedSqlDateTimeTypesTests {
+
+    @Test
+    public void testPromotesNamedBareInt64DateAndTime() {
+      Schema stripped =
+          Schema.builder()
+              .addInt64Field("count")
+              .addInt64Field("date")
+              .addInt64Field("time")
+              .build();
+      Schema restored = IcebergUtils.restorePortableDroppedSqlDateTimeTypes(stripped);
+      assertEquals(Schema.FieldType.INT64, restored.getField("count").getType());
+      assertEquals(
+          Schema.FieldType.logicalType(SqlTypes.DATE), restored.getField("date").getType());
+      assertEquals(
+          Schema.FieldType.logicalType(SqlTypes.TIME), restored.getField("time").getType());
+    }
+
+    @Test
+    public void testNestedRowWithDate() {
+      Schema inner = Schema.builder().addInt64Field("date").build();
+      Schema stripped = Schema.builder().addRowField("nested", inner).build();
+      Schema restored = IcebergUtils.restorePortableDroppedSqlDateTimeTypes(stripped);
+      Schema innerRestored = restored.getField("nested").getType().getRowSchema();
+      assertEquals(
+          Schema.FieldType.logicalType(SqlTypes.DATE), innerRestored.getField("date").getType());
     }
   }
 }
