@@ -19,6 +19,7 @@ package org.apache.beam.sdk.io.iceberg.catalog;
 
 import static org.apache.beam.sdk.io.iceberg.IcebergUtils.beamSchemaToIcebergSchema;
 import static org.apache.beam.sdk.io.iceberg.IcebergUtils.icebergSchemaToBeamSchema;
+import static org.apache.beam.sdk.io.iceberg.IcebergUtils.restorePortableDroppedSqlDateTimeTypes;
 import static org.apache.beam.sdk.managed.Managed.ICEBERG;
 import static org.apache.beam.sdk.managed.Managed.ICEBERG_CDC;
 import static org.apache.beam.sdk.util.Preconditions.checkStateNotNull;
@@ -176,6 +177,15 @@ public abstract class IcebergCatalogBaseIT implements Serializable {
 
   public String tableId() {
     return namespace() + ".test_table";
+  }
+
+  /**
+   * Iceberg table metadata read from a catalog may not exactly match {@link #BEAM_SCHEMA} after
+   * portable runner serialization or catalog-specific typing; normalize like {@link
+   * org.apache.beam.sdk.io.iceberg.PortableIcebergDestinations} does before comparing.
+   */
+  private static Schema beamSchemaReadBackFromIcebergTable(Table table) {
+    return restorePortableDroppedSqlDateTimeTypes(icebergSchemaToBeamSchema(table.schema()));
   }
 
   public static String warehouse(Class<? extends IcebergCatalogBaseIT> testClass) {
@@ -654,7 +664,7 @@ public abstract class IcebergCatalogBaseIT implements Serializable {
     pipeline.run().waitUntilFinish();
 
     Table table = catalog.loadTable(TableIdentifier.parse(tableId()));
-    assertTrue(BEAM_SCHEMA.equivalent(icebergSchemaToBeamSchema(table.schema())));
+    assertTrue(BEAM_SCHEMA.equivalent(beamSchemaReadBackFromIcebergTable(table)));
 
     // Read back and check records are correct
     List<Record> returnedRecords = readRecords(table);
@@ -825,7 +835,7 @@ public abstract class IcebergCatalogBaseIT implements Serializable {
     Table table4 = catalog.loadTable(TableIdentifier.parse(tableId() + "_4_e"));
 
     for (Table t : Arrays.asList(table0, table1, table2, table3, table4)) {
-      assertTrue(rowFilter.outputSchema().equivalent(icebergSchemaToBeamSchema(t.schema())));
+      assertTrue(rowFilter.outputSchema().equivalent(beamSchemaReadBackFromIcebergTable(t)));
     }
 
     // Read back and check records are correct
@@ -944,7 +954,7 @@ public abstract class IcebergCatalogBaseIT implements Serializable {
             table3false,
             table4true,
             table4false)) {
-      assertTrue(BEAM_SCHEMA.equivalent(icebergSchemaToBeamSchema(t.schema())));
+      assertTrue(BEAM_SCHEMA.equivalent(beamSchemaReadBackFromIcebergTable(t)));
     }
 
     // Read back and check records are correct

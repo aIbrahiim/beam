@@ -139,14 +139,21 @@ public class IcebergUtils {
   }
 
   /**
-   * Re-attaches {@link SqlTypes#DATE} / {@link SqlTypes#TIME} to fields that were widened to plain
-   * {@link Schema.TypeName#INT64} on the portable pipeline path (for example Dataflow's managed
-   * Iceberg write), so that {@link #beamSchemaToIcebergSchema} maps them to Iceberg date/time types
-   * instead of longs.
+   * Re-attaches SQL date/time typing that the portable pipeline path may drop (for example
+   * Dataflow's managed Iceberg write), so Beam schemas match full logical types again and {@link
+   * #beamSchemaToIcebergSchema} maps to the correct Iceberg types.
    *
-   * <p>Promotion uses the SQL-oriented field names {@code date} and {@code time} together with a
-   * bare {@code INT64} type (no logical type). Other {@code INT64} columns are unchanged. Nested
-   * {@link Schema.TypeName#ROW}, collection, and map types are processed recursively.
+   * <ul>
+   *   <li>Fields named {@code date} / {@code time} with bare {@code INT64} become {@link
+   *       SqlTypes#DATE} / {@link SqlTypes#TIME}.
+   *   <li>Field {@code datetime} whose type is a {@link Schema.TypeName#ROW} structurally equal to
+   *       the base row of {@link SqlTypes#DATETIME} ({@code Date} and {@code Time} as bare {@code
+   *       INT64}) becomes {@link SqlTypes#DATETIME}.
+   *   <li>Field {@code datetime_tz} with bare {@code INT64} becomes primitive {@link
+   *       Schema.FieldType#DATETIME} (portable encoding may widen timestamp-with-zone columns).
+   * </ul>
+   *
+   * <p>Nested {@link Schema.TypeName#ROW}, collection, and map types are processed recursively.
    */
   public static Schema restorePortableDroppedSqlDateTimeTypes(Schema schema) {
     List<Schema.Field> fields = new ArrayList<>(schema.getFieldCount());
@@ -161,8 +168,11 @@ public class IcebergUtils {
     Schema.TypeName typeName = type.getTypeName();
     if (typeName.isCompositeType()) {
       Schema nestedSchema = checkArgumentNotNull(type.getRowSchema());
-      return Schema.FieldType.row(restorePortableDroppedSqlDateTimeTypes(nestedSchema))
-          .withNullable(type.getNullable());
+      Schema restoredInner = restorePortableDroppedSqlDateTimeTypes(nestedSchema);
+      if ("datetime".equals(fieldName) && rowMatchesSqlDatetimeLogicalBase(restoredInner)) {
+        return Schema.FieldType.logicalType(SqlTypes.DATETIME).withNullable(type.getNullable());
+      }
+      return Schema.FieldType.row(restoredInner).withNullable(type.getNullable());
     }
     if (typeName.isCollectionType()) {
       Schema.FieldType elementType = checkArgumentNotNull(type.getCollectionElementType());
@@ -181,6 +191,29 @@ public class IcebergUtils {
     return promoteBareInt64ToSqlDateTime(fieldName, type);
   }
 
+  /**
+   * True when {@code row} matches the row base type of {@link SqlTypes#DATETIME}: required fields
+   * {@link org.apache.beam.sdk.schemas.logicaltypes.DateTime#DATE_FIELD_NAME} and {@link
+   * org.apache.beam.sdk.schemas.logicaltypes.DateTime#TIME_FIELD_NAME} as bare {@code INT64}.
+   */
+  private static boolean rowMatchesSqlDatetimeLogicalBase(Schema row) {
+    if (row.getFieldCount() != 2) {
+      return false;
+    }
+    Schema.Field dateField =
+        row.getField(org.apache.beam.sdk.schemas.logicaltypes.DateTime.DATE_FIELD_NAME);
+    Schema.Field timeField =
+        row.getField(org.apache.beam.sdk.schemas.logicaltypes.DateTime.TIME_FIELD_NAME);
+    if (dateField == null || timeField == null) {
+      return false;
+    }
+    return isBareInt64(dateField.getType()) && isBareInt64(timeField.getType());
+  }
+
+  private static boolean isBareInt64(Schema.FieldType type) {
+    return type.getTypeName() == Schema.TypeName.INT64 && type.getLogicalType() == null;
+  }
+
   private static Schema.FieldType promoteBareInt64ToSqlDateTime(
       String fieldName, Schema.FieldType type) {
     if (type.getTypeName() == Schema.TypeName.INT64 && type.getLogicalType() == null) {
@@ -189,6 +222,9 @@ public class IcebergUtils {
       }
       if ("time".equals(fieldName)) {
         return Schema.FieldType.logicalType(SqlTypes.TIME).withNullable(type.getNullable());
+      }
+      if ("datetime_tz".equals(fieldName)) {
+        return Schema.FieldType.DATETIME.withNullable(type.getNullable());
       }
     }
     return type;
@@ -709,14 +745,21 @@ public class IcebergUtils {
         return LocalDateTime.parse(strValue);
       }
     } else if (icebergValue instanceof Long) {
-      if (type.isLogicalType(SqlTypes.TIME.getIdentifier())) {
-        return DateTimeUtil.timeFromMicros((Long) icebergValue);
+      long lv = (Long) icebergValue;
+      if (type.isLogicalType(SqlTypes.DATE.getIdentifier())) {
+        return LocalDate.ofEpochDay(lv);
+      } else if (type.isLogicalType(SqlTypes.TIME.getIdentifier())) {
+        return DateTimeUtil.timeFromMicros(lv);
       } else if (type.isLogicalType(SqlTypes.DATETIME.getIdentifier())) {
-        return DateTimeUtil.timestampFromMicros((Long) icebergValue);
+        return DateTimeUtil.timestampFromMicros(lv);
       }
-    } else if (icebergValue instanceof Integer
-        && type.isLogicalType(SqlTypes.DATE.getIdentifier())) {
-      return DateTimeUtil.dateFromDays((Integer) icebergValue);
+    } else if (icebergValue instanceof Integer) {
+      int iv = (Integer) icebergValue;
+      if (type.isLogicalType(SqlTypes.DATE.getIdentifier())) {
+        return DateTimeUtil.dateFromDays(iv);
+      } else if (type.isLogicalType(SqlTypes.TIME.getIdentifier())) {
+        return DateTimeUtil.timeFromMicros((long) iv);
+      }
     } else if (icebergValue instanceof OffsetDateTime
         && type.isLogicalType(SqlTypes.DATETIME.getIdentifier())) {
       return ((OffsetDateTime) icebergValue)

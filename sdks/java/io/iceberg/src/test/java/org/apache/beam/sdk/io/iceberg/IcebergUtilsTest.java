@@ -354,6 +354,24 @@ public class IcebergUtilsTest {
     }
 
     @Test
+    public void testDateFromLongEpochDay() {
+      checkRecordValueToRowValue(
+          Types.DateType.get(),
+          0L,
+          Schema.FieldType.logicalType(SqlTypes.DATE),
+          LocalDate.ofEpochDay(0));
+    }
+
+    @Test
+    public void testTimeFromIntegerMicros() {
+      checkRecordValueToRowValue(
+          Types.TimeType.get(),
+          0,
+          Schema.FieldType.logicalType(SqlTypes.TIME),
+          DateTimeUtil.timeFromMicros(0L));
+    }
+
+    @Test
     public void testTimestamp() {
       // SqlTypes.DATETIME
       checkRecordValueToRowValue(
@@ -1091,6 +1109,27 @@ public class IcebergUtilsTest {
       Schema stripped = Schema.builder().addInt64Field("date").build();
       org.apache.iceberg.Schema iceberg = IcebergUtils.beamSchemaToIcebergSchema(stripped);
       assertEquals(Types.DateType.get(), iceberg.findField("date").type());
+    }
+
+    @Test
+    public void testPromotesBareInt64DatetimeTzToPrimitiveDatetime() {
+      Schema stripped = Schema.builder().addInt64Field("id").addInt64Field("datetime_tz").build();
+      Schema restored = IcebergUtils.restorePortableDroppedSqlDateTimeTypes(stripped);
+      assertEquals(Schema.FieldType.INT64, restored.getField("id").getType());
+      assertEquals(Schema.FieldType.DATETIME, restored.getField("datetime_tz").getType());
+    }
+
+    @Test
+    public void testWrapsBareRowAsSqlDatetimeForFieldNameDatetime() {
+      Schema inner =
+          Schema.builder()
+              .addInt64Field(org.apache.beam.sdk.schemas.logicaltypes.DateTime.DATE_FIELD_NAME)
+              .addInt64Field(org.apache.beam.sdk.schemas.logicaltypes.DateTime.TIME_FIELD_NAME)
+              .build();
+      Schema stripped = Schema.builder().addRowField("datetime", inner).build();
+      Schema restored = IcebergUtils.restorePortableDroppedSqlDateTimeTypes(stripped);
+      assertEquals(
+          Schema.FieldType.logicalType(SqlTypes.DATETIME), restored.getField("datetime").getType());
     }
   }
 }
