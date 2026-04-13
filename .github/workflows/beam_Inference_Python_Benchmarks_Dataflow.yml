@@ -135,7 +135,7 @@ jobs:
             -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_sentiment_benchmarks \
             -Prunner=DataflowRunner \
             -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_sentiment_tensorrt_container_requirements.txt \
+            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_6 }} --mode=streaming --job_name=benchmark-tests-pytorch-sentiment-distilbert-base-uncased-streaming-${{env.NOW_UTC}} --output_table=apache-beam-testing.beam_run_inference.result_sentiment_distilbert_base_uncased' \
       - name: run Pytorch Sentiment Batch using Hugging Face distilbert-base-uncased model
         uses: ./.github/actions/gradle-command-self-hosted-action
@@ -146,7 +146,7 @@ jobs:
             -PloadTest.mainClass=apache_beam.testing.benchmarks.inference.pytorch_sentiment_benchmarks \
             -Prunner=DataflowRunner \
             -PpythonVersion=3.10 \
-            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_sentiment_tensorrt_container_requirements.txt \
+            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_7 }} --mode=batch --job_name=benchmark-tests-pytorch-sentiment-distilbert-base-uncased-batch-${{env.NOW_UTC}} --output_table=apache-beam-testing.beam_run_inference.result_sentiment_distilbert_base_uncased' \
       - name: run Pytorch Vision Classification with Resnet 101
         if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.pytorch_sentiment_benchmarks_only == true) }}
