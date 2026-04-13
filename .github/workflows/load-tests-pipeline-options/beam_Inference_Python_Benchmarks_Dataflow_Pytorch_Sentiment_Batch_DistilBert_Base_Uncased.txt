@@ -22,7 +22,7 @@
 --autoscaling_algorithm=THROUGHPUT_BASED
 --staging_location=gs://temp-storage-for-perf-tests/loadtests
 --temp_location=gs://temp-storage-for-perf-tests/loadtests
---requirements_file=apache_beam/ml/inference/torch_tests_requirements.txt
+--requirements_file=apache_beam/ml/inference/torch_sentiment_tensorrt_container_requirements.txt
 --publish_to_big_query=true
 --metrics_dataset=beam_run_inference
 --metrics_table=torch_sentiment_distilbert_base_uncased_batch
