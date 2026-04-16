@@ -20,8 +20,7 @@
 import logging
 
 from apache_beam.examples.ml_transform import mltransform_generate_vocab
-from apache_beam.testing.load_tests.dataflow_cost_benchmark import (
-    DataflowCostBenchmark)
+from apache_beam.testing.load_tests.dataflow_cost_benchmark import DataflowCostBenchmark
 
 
 class MLTransformGenerateVocabBenchmarkTest(DataflowCostBenchmark):
