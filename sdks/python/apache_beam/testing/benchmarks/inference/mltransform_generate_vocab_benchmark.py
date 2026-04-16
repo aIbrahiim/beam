@@ -26,7 +26,6 @@ from apache_beam.testing.load_tests.dataflow_cost_benchmark import (
 
 class MLTransformGenerateVocabBenchmarkTest(DataflowCostBenchmark):
   """Runs the MLTransform vocab generation pipeline as a cost benchmark."""
-
   def __init__(self):
     # Namespace used by benchmark dashboards.
     self.metrics_namespace = 'BeamML_MLTransformVocab'
@@ -57,4 +56,3 @@ class MLTransformGenerateVocabBenchmarkTest(DataflowCostBenchmark):
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
   MLTransformGenerateVocabBenchmarkTest().run()
-

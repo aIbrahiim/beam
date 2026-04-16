@@ -102,13 +102,27 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
       output_prefix = os.path.join(tmpdir, 'vocab.txt')
 
       rows = [
-          {'id': '1', 'text': 'Beam beam ML pipeline'},
-          {'id': '2', 'text': 'Beam pipeline dataflow'},
-          {'id': '3', 'text': 'ML transform beam'},
-          {'id': '4', 'text': 'vocab vocab vocab test'},
-          {'id': '5', 'text': 'rare_token_once'},
-          {'id': '6', 'text': ''},
-          {'id': '7', 'text': None},
+          {
+              'id': '1', 'text': 'Beam beam ML pipeline'
+          },
+          {
+              'id': '2', 'text': 'Beam pipeline dataflow'
+          },
+          {
+              'id': '3', 'text': 'ML transform beam'
+          },
+          {
+              'id': '4', 'text': 'vocab vocab vocab test'
+          },
+          {
+              'id': '5', 'text': 'rare_token_once'
+          },
+          {
+              'id': '6', 'text': ''
+          },
+          {
+              'id': '7', 'text': None
+          },
       ]
       with open(input_path, 'w', encoding='utf-8') as f:
         for row in rows:
@@ -126,7 +140,7 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
           '--runner=DirectRunner',
       ])
 
-      output_path = output_prefix + '-00000-of-00001'
+      output_path = output_prefix
       with open(output_path, 'r', encoding='utf-8') as f:
         output_tokens = [line.rstrip('\n') for line in f]
 
@@ -141,10 +155,18 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
       input_path = os.path.join(tmpdir, 'input.jsonl')
       output_prefix = os.path.join(tmpdir, 'vocab.txt')
       rows = [
-          {'text': 'apple banana'},
-          {'text': 'banana apple'},
-          {'text': 'cat dog'},
-          {'text': 'dog cat'},
+          {
+              'text': 'apple banana'
+          },
+          {
+              'text': 'banana apple'
+          },
+          {
+              'text': 'cat dog'
+          },
+          {
+              'text': 'dog cat'
+          },
       ]
       with open(input_path, 'w', encoding='utf-8') as f:
         for row in rows:
@@ -162,10 +184,11 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
           '--runner=DirectRunner',
       ])
 
-      output_path = output_prefix + '-00000-of-00001'
+      output_path = output_prefix
       with open(output_path, 'r', encoding='utf-8') as f:
         output_tokens = [line.rstrip('\n') for line in f]
-      self.assertEqual(output_tokens, ['<UNK>', 'apple', 'banana', 'cat', 'dog'])
+      self.assertEqual(
+          output_tokens, ['<UNK>', 'apple', 'banana', 'cat', 'dog'])
 
   def test_empty_filtered_result_writes_only_reserved_token(self):
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -184,7 +207,7 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
           '--runner=DirectRunner',
       ])
 
-      output_path = output_prefix + '-00000-of-00001'
+      output_path = output_prefix
       with open(output_path, 'r', encoding='utf-8') as f:
         output_tokens = [line.rstrip('\n') for line in f]
       self.assertEqual(output_tokens, ['<UNK>'])
@@ -192,4 +215,3 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
 
 if __name__ == '__main__':
   unittest.main()
-

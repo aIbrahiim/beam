@@ -193,6 +193,7 @@ class DataflowCostBenchmark(LoadTest):
     """Query Cloud Monitoring for per-PCollection throughput."""
     name = (
         pcollection_name if pcollection_name is not None else self.pcollection)
+
     def _point_numeric_value(point) -> float:
       value = point.value
       # point.value is proto-plus, so use the underlying protobuf oneof.
@@ -214,6 +215,7 @@ class DataflowCostBenchmark(LoadTest):
           nanos = getattr(money, 'nanos', 0) or 0
           return float(money.units) + (float(nanos) / 1_000_000_000.0)
       return 0.0
+
     interval = monitoring_v3.TimeInterval(
         start_time=start_time, end_time=end_time)
     aggregation = monitoring_v3.Aggregation(

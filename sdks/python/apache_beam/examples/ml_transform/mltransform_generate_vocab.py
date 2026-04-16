@@ -33,9 +33,7 @@ import argparse
 import json
 import logging
 import re
-from collections.abc import Iterable
 from typing import Any
-from typing import Optional
 
 import apache_beam as beam
 from apache_beam.options.pipeline_options import PipelineOptions
@@ -96,11 +94,13 @@ def _parse_json_line(line: str) -> dict[str, Any]:
     # Treat plain-text rows as values for the default "text" column.
     return {'text': line}
   if not isinstance(parsed, dict):
-    raise ValueError(f'Input JSON line must decode to an object, got: {parsed!r}')
+    raise ValueError(
+        f'Input JSON line must decode to an object, got: {parsed!r}')
   return parsed
 
 
-def _extract_column_values(row: dict[str, Any], columns: list[str]) -> list[Any]:
+def _extract_column_values(row: dict[str, Any],
+                           columns: list[str]) -> list[Any]:
   values = []
   for col in columns:
     if col not in row:
@@ -220,13 +220,11 @@ def run(argv=None, test_pipeline=None):
 
   tokens = (
       rows
-      | 'ExtractColumnValues' >> beam.Map(
-          lambda row: _extract_column_values(row, columns))
+      | 'ExtractColumnValues' >>
+      beam.Map(lambda row: _extract_column_values(row, columns))
       | 'TokenizeRowValues' >> beam.Map(
           lambda values: _tokenize_row_values(
-              values,
-              lowercase=lowercase,
-              tokenizer=known_args.tokenizer))
+              values, lowercase=lowercase, tokenizer=known_args.tokenizer))
       | 'FlattenTokens' >> beam.FlatMap(lambda token_list: token_list)
       | 'DropEmptyTokens' >> beam.Filter(bool))
 
@@ -236,9 +234,8 @@ def run(argv=None, test_pipeline=None):
       | 'CollectTokenCounts' >> beam.combiners.ToList()
       | 'RankAndSelectTokens' >> beam.Map(
           lambda counts: rank_and_select_tokens(
-              counts,
-              vocab_size=known_args.vocab_size,
-              min_frequency=known_args.min_frequency)))
+              counts, vocab_size=known_args.vocab_size, min_frequency=known_args
+              .min_frequency)))
 
   def build_output_vocab(tokens_list: list[str], oov_token: str) -> list[str]:
     # If everything is filtered out, still write the reserved token.
@@ -254,7 +251,8 @@ def run(argv=None, test_pipeline=None):
   output_lines = (
       ranked_tokens
       | 'BuildOutputVocabulary' >> beam.Map(
-          lambda token_list: build_output_vocab(token_list, known_args.oov_token))
+          lambda token_list: build_output_vocab(
+              token_list, known_args.oov_token))
       | 'FlattenOutputLines' >> beam.FlatMap(lambda token_list: token_list))
 
   _ = output_lines | 'WriteVocab' >> beam.io.WriteToText(
@@ -269,4 +267,3 @@ def run(argv=None, test_pipeline=None):
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
   run()
-

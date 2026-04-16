@@ -1,3 +1,17 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
 # MLTransform Examples
 
 This directory contains Apache Beam examples for MLTransform pipelines.
@@ -66,8 +80,8 @@ JSONL input with object rows, for example:
 {"id":"7","text":null}
 ```
 
-The same sample is available at:
-`apache_beam/examples/ml_transform/testdata/vocab_test_input.jsonl`
+The integration tests in `mltransform_generate_vocab_test.py` generate this
+sample data programmatically.
 
 ### Output format
 
@@ -108,9 +122,8 @@ the reserved `--oov_token` and logs a warning.
 
 ### Additional test datasets
 
-- Happy path: `testdata/vocab_test_input.jsonl`
-- Tie-break verification: `testdata/vocab_tie_break_input.jsonl`
-- Null/empty/missing column: `testdata/vocab_edge_nulls_input.jsonl`
+Test data for happy path, tie-break verification, and null/empty/missing
+columns is generated inline in `mltransform_generate_vocab_test.py`.
 
 ### Performance testing pattern
 
