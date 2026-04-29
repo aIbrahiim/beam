@@ -18,8 +18,8 @@ This directory contains Apache Beam examples for MLTransform pipelines.
 
 ## MLTransform - Generate Vocab (Batch only)
 
-`mltransform_generate_vocab.py` builds a deterministic vocabulary artifact from
-batch input rows.
+`mltransform_generate_vocab.py` builds a vocabulary artifact from batch input
+rows using `MLTransform` + `ComputeAndApplyVocabulary`.
 
 ### What it does
 
@@ -27,11 +27,9 @@ batch input rows.
 2. Extracts specified columns (`--columns`).
 3. Normalizes text (`trim`, optional lowercasing).
 4. Tokenizes text (`whitespace` or `regex` tokenizer).
-5. Counts global token frequencies.
-6. Applies `--min_frequency`, ranks deterministically, and keeps top
-   `--vocab_size`.
-7. Ensures `--oov_token` is included first.
-8. Writes the vocabulary as one token per line.
+5. Runs `ComputeAndApplyVocabulary` with top-k and min-frequency constraints.
+6. Ensures `--oov_token` is included first.
+7. Writes the vocabulary as one token per line.
 
 ### Required arguments
 
@@ -85,12 +83,11 @@ sample data programmatically.
 
 ### Output format
 
-One token per line, deterministic order:
+One token per line:
 
 1. `oov_token` first
-2. remaining tokens sorted by:
-   - frequency descending
-   - token ascending (for ties)
+2. remaining tokens follow the vocabulary order produced by
+   `ComputeAndApplyVocabulary`.
 
 Example output:
 
@@ -122,12 +119,12 @@ the reserved `--oov_token` and logs a warning.
 
 ### Additional test datasets
 
-Test data for happy path, tie-break verification, and null/empty/missing
-columns is generated inline in `mltransform_generate_vocab_test.py`.
+Test data for happy path and null/empty/missing columns is generated inline in
+`mltransform_generate_vocab_test.py`.
 
 ### Performance testing pattern
 
-- Small local files: functional correctness and deterministic-order tests.
+- Small local files: functional correctness and output-stability tests.
 - Large GCS files (or moderate file + `--input_expand_factor`): throughput/cost
   benchmarking on Dataflow.
 

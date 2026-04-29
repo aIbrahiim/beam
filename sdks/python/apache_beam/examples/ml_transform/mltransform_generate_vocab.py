@@ -15,16 +15,13 @@
 # limitations under the License.
 #
 
-"""Batch-only deterministic vocabulary generation pipeline.
+"""Batch-only vocabulary generation pipeline using MLTransform.
 
-This pipeline creates a deterministic vocabulary artifact from one or more
-input columns.
+This pipeline creates a vocabulary artifact from one or more input columns.
 
 Key properties:
 - Batch only (no streaming path).
-- Deterministic ordering:
-  1) token frequency descending
-  2) token text ascending for tie-breaks
+- Vocabulary generation via MLTransform ComputeAndApplyVocabulary.
 - Reserved OOV token is always written first.
 - Output format: one token per line.
 """
@@ -33,9 +30,13 @@ import argparse
 import json
 import logging
 import re
+import tempfile
 from typing import Any
 
 import apache_beam as beam
+from apache_beam.io.filesystems import FileSystems
+from apache_beam.ml.transforms.base import MLTransform
+from apache_beam.ml.transforms.tft import ComputeAndApplyVocabulary
 from apache_beam.options.pipeline_options import PipelineOptions
 
 SUPPORTED_TOKENIZERS = ('whitespace', 'regex')
@@ -74,17 +75,6 @@ def tokenize_text(
   raise ValueError(
       f'Unsupported tokenizer {tokenizer!r}. '
       f'Supported tokenizers: {", ".join(SUPPORTED_TOKENIZERS)}')
-
-
-def rank_and_select_tokens(
-    token_counts: list[tuple[str, int]],
-    vocab_size: int,
-    min_frequency: int,
-) -> list[str]:
-  filtered = [(token, count) for token, count in token_counts
-              if count >= min_frequency]
-  ranked = sorted(filtered, key=lambda item: (-item[1], item[0]))
-  return [token for token, _ in ranked[:vocab_size]]
 
 
 def _parse_json_line(line: str) -> dict[str, Any]:
@@ -127,9 +117,39 @@ def _tokenize_row_values(
   return tokens
 
 
+def _resolve_vocab_asset_path(
+    artifact_location: str, vocab_filename: str, column_name: str) -> str:
+  asset_name = f'{vocab_filename}_{column_name}'
+  pattern = (
+      f'{artifact_location.rstrip("/")}'
+      f'/*/transform_fn/assets/{asset_name}')
+  matches = FileSystems.match([pattern])[0].metadata_list
+  if not matches:
+    raise ValueError(
+        f'Could not locate vocabulary artifact {asset_name!r} under '
+        f'{artifact_location!r}.')
+  return matches[0].path
+
+
+def _read_vocab_tokens(vocab_asset_path: str) -> list[str]:
+  tokens = []
+  with FileSystems.open(vocab_asset_path) as f:
+    for raw_line in f:
+      token = raw_line.decode('utf-8').rstrip('\n')
+      if token:
+        tokens.append(token)
+  return tokens
+
+
+def _write_vocab_file(output_path: str, tokens: list[str]) -> None:
+  with FileSystems.create(output_path) as f:
+    for token in tokens:
+      f.write((token + '\n').encode('utf-8'))
+
+
 def parse_known_args(argv):
   parser = argparse.ArgumentParser(
-      description='Generate deterministic vocabulary from batch input.')
+      description='Generate vocabulary from batch input with MLTransform.')
   parser.add_argument('--input_file', help='Input JSONL file path.')
   parser.add_argument(
       '--input_table',
@@ -167,6 +187,12 @@ def parse_known_args(argv):
       help=(
           'Batch-only: repeat each input line this many times to scale volume '
           'for load/perf testing.'))
+  parser.add_argument(
+      '--artifact_location',
+      default='',
+      help=(
+          'Artifact directory for MLTransform output. If empty, a temporary '
+          'local directory is used.'))
   return parser.parse_known_args(argv)
 
 
@@ -200,6 +226,8 @@ def run(argv=None, test_pipeline=None):
   known_args, pipeline_args = parse_known_args(argv)
   columns = validate_args(known_args)
   lowercase = parse_bool_flag(known_args.lowercase)
+  artifact_location = known_args.artifact_location or tempfile.mkdtemp(
+      prefix='mltransform_generate_vocab_artifacts_')
 
   options = PipelineOptions(pipeline_args)
   pipeline = test_pipeline or beam.Pipeline(options=options)
@@ -218,49 +246,45 @@ def run(argv=None, test_pipeline=None):
     rows = pipeline | 'ReadInputTable' >> beam.io.ReadFromBigQuery(
         table=known_args.input_table)
 
-  tokens = (
+  token_lists = (
       rows
       | 'ExtractColumnValues' >>
       beam.Map(lambda row: _extract_column_values(row, columns))
       | 'TokenizeRowValues' >> beam.Map(
           lambda values: _tokenize_row_values(
               values, lowercase=lowercase, tokenizer=known_args.tokenizer))
-      | 'FlattenTokens' >> beam.FlatMap(lambda token_list: token_list)
+      | 'DropEmptyTokenLists' >> beam.Filter(bool))
+
+  _ = (
+      token_lists
+      | 'MLTransformInput' >> beam.Map(lambda tokens: {'tokens': tokens})
+      | 'ApplyMLTransform' >> MLTransform(
+          write_artifact_location=artifact_location).with_transform(
+              ComputeAndApplyVocabulary(
+                  columns=['tokens'],
+                  top_k=known_args.vocab_size,
+                  frequency_threshold=known_args.min_frequency,
+                  vocab_filename='vocab'))
+      | 'ExtractTransformedTokens' >> beam.Map(lambda row: row.tokens)
+      | 'FlattenTokens' >> beam.FlatMap(list)
       | 'DropEmptyTokens' >> beam.Filter(bool))
 
-  ranked_tokens = (
-      tokens
-      | 'CountTokensGlobally' >> beam.combiners.Count.PerElement()
-      | 'CollectTokenCounts' >> beam.combiners.ToList()
-      | 'RankAndSelectTokens' >> beam.Map(
-          lambda counts: rank_and_select_tokens(
-              counts, vocab_size=known_args.vocab_size, min_frequency=known_args
-              .min_frequency)))
-
-  def build_output_vocab(tokens_list: list[str], oov_token: str) -> list[str]:
-    # If everything is filtered out, still write the reserved token.
-    if not tokens_list:
-      logging.warning(
-          'No tokens remained after filtering; writing only reserved token %r.',
-          oov_token)
-      return [oov_token]
-    output = [oov_token]
-    output.extend(token for token in tokens_list if token != oov_token)
-    return output
-
-  output_lines = (
-      ranked_tokens
-      | 'BuildOutputVocabulary' >> beam.Map(
-          lambda token_list: build_output_vocab(
-              token_list, known_args.oov_token))
-      | 'FlattenOutputLines' >> beam.FlatMap(lambda token_list: token_list))
-
-  _ = output_lines | 'WriteVocab' >> beam.io.WriteToText(
-      known_args.output_vocab, shard_name_template='')
-
   result = pipeline.run()
-  if not test_pipeline:
-    result.wait_until_finish()
+  result.wait_until_finish()
+
+  vocab_tokens = _read_vocab_tokens(
+      _resolve_vocab_asset_path(
+          artifact_location=artifact_location,
+          vocab_filename='vocab',
+          column_name='tokens'))
+  output_tokens = [known_args.oov_token]
+  output_tokens.extend(token for token in vocab_tokens
+                       if token != known_args.oov_token)
+  if len(output_tokens) == 1:
+    logging.warning(
+        'No tokens remained after filtering; writing only reserved token %r.',
+        known_args.oov_token)
+  _write_vocab_file(known_args.output_vocab, output_tokens)
   return result
 
 

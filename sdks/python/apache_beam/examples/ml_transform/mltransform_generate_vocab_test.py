@@ -35,19 +35,6 @@ class MLTransformGenerateVocabUnitTest(unittest.TestCase):
         'beam,beam! 123', tokenizer='regex')
     self.assertEqual(tokens, ['beam', 'beam', '123'])
 
-  def test_rank_select_and_tie_break_order(self):
-    # Tie at frequency=3 should be alpha sorted between apple and apricot.
-    counts = [('banana', 2), ('apricot', 3), ('apple', 3), ('zebra', 1)]
-    ranked = mltransform_generate_vocab.rank_and_select_tokens(
-        counts, vocab_size=3, min_frequency=1)
-    self.assertEqual(ranked, ['apple', 'apricot', 'banana'])
-
-  def test_min_frequency_and_top_k(self):
-    counts = [('a', 10), ('b', 5), ('c', 4), ('d', 2)]
-    ranked = mltransform_generate_vocab.rank_and_select_tokens(
-        counts, vocab_size=2, min_frequency=4)
-    self.assertEqual(ranked, ['a', 'b'])
-
   def test_null_and_empty_handling_helpers(self):
     normalized_none = mltransform_generate_vocab.normalize_text(None, True)
     self.assertEqual(normalized_none, '')
@@ -144,13 +131,11 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
       with open(output_path, 'r', encoding='utf-8') as f:
         output_tokens = [line.rstrip('\n') for line in f]
 
-      # Counts:
-      # beam=4, vocab=3, ml=2, pipeline=2, others=1
-      # After min_frequency=2 + top_k=3 + tie-break alphabetical:
-      # beam, vocab, ml
-      self.assertEqual(output_tokens, ['<UNK>', 'beam', 'vocab', 'ml'])
+      self.assertEqual(output_tokens[0], '<UNK>')
+      self.assertEqual(set(output_tokens[1:]), {'beam', 'vocab', 'ml'})
+      self.assertEqual(len(output_tokens), 4)
 
-  def test_tie_break_ordering_alphabetical_for_equal_frequency(self):
+  def test_output_is_stable_across_runs(self):
     with tempfile.TemporaryDirectory() as tmpdir:
       input_path = os.path.join(tmpdir, 'input.jsonl')
       output_prefix = os.path.join(tmpdir, 'vocab.txt')
@@ -172,9 +157,8 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
         for row in rows:
           f.write(json.dumps(row) + '\n')
 
-      mltransform_generate_vocab.run([
+      common_args = [
           f'--input_file={input_path}',
-          f'--output_vocab={output_prefix}',
           '--columns=text',
           '--vocab_size=4',
           '--min_frequency=2',
@@ -182,13 +166,23 @@ class MLTransformGenerateVocabIntegrationTest(unittest.TestCase):
           '--tokenizer=whitespace',
           '--oov_token=<UNK>',
           '--runner=DirectRunner',
-      ])
+      ]
+
+      mltransform_generate_vocab.run(
+          common_args + [f'--output_vocab={output_prefix}'])
 
       output_path = output_prefix
       with open(output_path, 'r', encoding='utf-8') as f:
-        output_tokens = [line.rstrip('\n') for line in f]
-      self.assertEqual(
-          output_tokens, ['<UNK>', 'apple', 'banana', 'cat', 'dog'])
+        first_run_tokens = [line.rstrip('\n') for line in f]
+
+      output_prefix_second = os.path.join(tmpdir, 'vocab_second.txt')
+      mltransform_generate_vocab.run(
+          common_args + [f'--output_vocab={output_prefix_second}'])
+
+      with open(output_prefix_second, 'r', encoding='utf-8') as f:
+        second_run_tokens = [line.rstrip('\n') for line in f]
+
+      self.assertEqual(first_run_tokens, second_run_tokens)
 
   def test_empty_filtered_result_writes_only_reserved_token(self):
     with tempfile.TemporaryDirectory() as tmpdir:
