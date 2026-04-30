@@ -39,6 +39,7 @@ class MLTransformGenerateVocabBenchmarkTest(DataflowCostBenchmark):
     extra_opts = {
         'input_file': self.pipeline.get_option('input_file'),
         'output_vocab': self.pipeline.get_option('output_vocab'),
+        'artifact_location': self.pipeline.get_option('artifact_location'),
         'columns': self.pipeline.get_option('columns'),
         'vocab_size': self.pipeline.get_option('vocab_size'),
         'min_frequency': self.pipeline.get_option('min_frequency'),

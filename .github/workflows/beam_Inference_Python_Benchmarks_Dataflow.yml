@@ -105,4 +105,4 @@ jobs:
             -PpythonVersion=3.10 \
             -PbeamPythonExtra=ml_test \
             -PloadTest.requirementsTxtFile=apache_beam/ml/transforms/mltransform_tests_requirements.txt \
-            '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_1 }} --job_name=benchmark-tests-mltransform-generate-vocab-batch-${{env.NOW_UTC}}'
+            '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_1 }} --job_name=benchmark-tests-mltransform-generate-vocab-batch-${{env.NOW_UTC}} --artifact_location=gs://temp-storage-for-perf-tests/mltransform/vocab_artifacts/mltransform_generate_vocab_batch_${{env.NOW_UTC}} --output_vocab=gs://temp-storage-for-perf-tests/mltransform/vocab_outputs/mltransform_generate_vocab_batch_${{env.NOW_UTC}}'

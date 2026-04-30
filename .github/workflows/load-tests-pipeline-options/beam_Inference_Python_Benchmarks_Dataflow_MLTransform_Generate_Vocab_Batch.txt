@@ -33,6 +33,7 @@
 --influx_measurement=mltransform_generate_vocab_batch
 --input_file=gs://apache-beam-ml/testing/inputs/sentences_50k.txt
 --output_vocab=gs://temp-storage-for-perf-tests/mltransform/vocab_outputs/mltransform_generate_vocab_batch_test
+--artifact_location=gs://temp-storage-for-perf-tests/mltransform/vocab_artifacts/mltransform_generate_vocab_batch_test
 --columns=text
 --vocab_size=50000
 --min_frequency=1
