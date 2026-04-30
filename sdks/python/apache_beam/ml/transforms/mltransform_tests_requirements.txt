@@ -18,4 +18,6 @@
 # does not depend on TensorFlow/TensorFlow Transform, and those packages can
 # force incompatible apache-beam constraints during CI resolution.
 google-cloud-monitoring>=2.27.0
+# Required by MLTransform TFT handlers at worker runtime.
+tensorflow-metadata>=1.14.0,<1.15.0
 

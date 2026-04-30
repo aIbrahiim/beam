@@ -25,6 +25,7 @@
 --max_num_workers=4
 --autoscaling_algorithm=THROUGHPUT_BASED
 --sdk_location=container
+--requirements_file=apache_beam/ml/transforms/mltransform_tests_requirements.txt
 --input_options={}
 --publish_to_big_query=true
 --metrics_dataset=beam_run_inference
