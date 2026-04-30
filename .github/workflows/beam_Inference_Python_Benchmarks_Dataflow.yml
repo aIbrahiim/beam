@@ -104,13 +104,6 @@ jobs:
           dockerfile_path: 'sdks/python/apache_beam/ml/inference/test_resources/vllm.dockerfile'
           image_name: 'us-docker.pkg.dev/apache-beam-testing/beam-temp/beam-vllm-gpu-base'
           image_tag: ${{ github.sha }}
-      - name: Build PyTorch GPU Benchmark Image
-        id: build_pytorch_gpu_image
-        uses: ./.github/actions/build-push-docker-action
-        with:
-          dockerfile_path: 'sdks/python/apache_beam/ml/inference/test_resources/pytorch_gpu.dockerfile'
-          image_name: 'us-docker.pkg.dev/apache-beam-testing/beam-temp/beam-pytorch-gpu-base'
-          image_tag: ${{ github.sha }}
       - name: Run VLLM Gemma Batch Test
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
@@ -198,7 +191,7 @@ jobs:
             -Prunner=DataflowRunner \
             -PpythonVersion=3.10 \
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
-            '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_5 }} --job_name=benchmark-tests-pytorch-imagenet-python-gpu-${{env.NOW_UTC}} --sdk_container_image=${{ steps.build_pytorch_gpu_image.outputs.image_url }} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet152_gpu-${{env.NOW_UTC}}.txt'
+            '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_5 }} --job_name=benchmark-tests-pytorch-imagenet-python-gpu-${{env.NOW_UTC}} --sdk_container_image=${{ steps.build_vllm_image.outputs.image_url }} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet152_gpu-${{env.NOW_UTC}}.txt'
       - name: run Table Row Inference Sklearn Batch
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
