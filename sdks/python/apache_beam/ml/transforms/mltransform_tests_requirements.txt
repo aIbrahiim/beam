@@ -14,12 +14,17 @@
 # limitations under the License.
 #
 
-# Keep this benchmark requirements minimal. The vocab benchmark implementation
-# does not depend on TensorFlow/TensorFlow Transform, and those packages can
-# force incompatible apache-beam constraints during CI resolution.
+# Keep this benchmark requirements focused and deterministic for Dataflow
+# workers. MLTransform TFT operations require a consistent TensorFlow Transform
+# dependency set; otherwise workers can crash-loop with pandas/numpy ABI
+# mismatches during SDK harness startup.
 google-cloud-monitoring>=2.27.0
-# Required by MLTransform TFT handlers at worker runtime.
+tensorflow_transform>=1.14.0,<1.15.0
 tensorflow-metadata>=1.14.0,<1.15.0
-# Required transitively by tensorflow_transform at worker runtime.
 tfx-bsl>=1.14.0,<1.15.0
+# tfx-bsl / tensorflow-transform rely on pandas 1.x with numpy 1.x.
+numpy<2
+pandas<2
+# tensorflow-transform expects dill but does not hard-pin it.
+dill
 
