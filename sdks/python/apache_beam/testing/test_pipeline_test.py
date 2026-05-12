@@ -112,6 +112,16 @@ class TestPipelineTest(unittest.TestCase):
     test_pipeline.options_list = ['--%s=%s' % (name, value)]
     self.assertEqual(test_pipeline.get_option(name), value)
 
+  def test_get_option_no_abbrev_prefix_collision_with_model_path(self):
+    test_pipeline = TestPipeline()
+    test_pipeline.options_list = [
+        '--mode',
+        'batch',
+        '--model_path=gs://bucket/model.pkl',
+    ]
+    self.assertEqual(
+        test_pipeline.get_option('model_path'), 'gs://bucket/model.pkl')
+
   def test_skip_IT(self):
     with TestPipeline(is_integration_test=True) as _:
       # Note that this will never be reached since it should be skipped above.

@@ -209,7 +209,9 @@ class TestPipeline(Pipeline):
       None if option is not found in existing option list which is generated
       by parsing value of argument `test-pipeline-options`.
     """
-    parser = argparse.ArgumentParser()
+    # Disallow abbreviation so e.g. --mode is not parsed as --model_path
+    # when only --model_path is registered (prefix collision).
+    parser = argparse.ArgumentParser(allow_abbrev=False)
     opt_name = opt_name[:2] if opt_name[:2] == '--' else opt_name
     # Option name should start with '--' when it's used for parsing.
     if bool_option:
