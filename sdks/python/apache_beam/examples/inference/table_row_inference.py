@@ -211,7 +211,8 @@ def build_output_schema(feature_columns: list[str]) -> str:
 
 def parse_known_args(argv):
   """Parse command-line arguments for the pipeline."""
-  parser = argparse.ArgumentParser()
+  # Disallow abbreviations so e.g. --mode is never taken as --model_path.
+  parser = argparse.ArgumentParser(allow_abbrev=False)
 
   parser.add_argument(
       '--mode',

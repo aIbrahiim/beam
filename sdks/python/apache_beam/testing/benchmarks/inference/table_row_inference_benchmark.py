@@ -72,32 +72,36 @@ class TableRowInferenceBenchmarkTest(DataflowCostBenchmark):
         metrics_namespace=self.metrics_namespace,
         is_streaming=False,
         pcollection='RunInference/BeamML_RunInference_Postprocess-0.out0')
-    self.is_streaming = ((self.pipeline.get_option('mode') or
-                          'batch') == 'streaming')
+    row_opts = self.pipeline.get_pipeline_options().view_as(
+        TableRowInferenceOptions)
+    self.is_streaming = (row_opts.mode or 'batch') == 'streaming'
     if self.is_streaming:
-      self.subscription = self.pipeline.get_option('input_subscription')
+      self.subscription = row_opts.input_subscription
 
   def test(self):
     """Execute the table row inference pipeline for benchmarking."""
+    row_opts = self.pipeline.get_pipeline_options().view_as(
+        TableRowInferenceOptions)
     extra_opts = {}
 
-    mode = self.pipeline.get_option('mode') or 'batch'
+    mode = row_opts.mode or 'batch'
     extra_opts['mode'] = mode
 
     if mode == 'streaming':
-      extra_opts['input_subscription'] = self.pipeline.get_option(
-          'input_subscription')
-      extra_opts['window_size_sec'] = int(
-          self.pipeline.get_option('window_size_sec') or 60)
+      if row_opts.input_subscription:
+        extra_opts['input_subscription'] = row_opts.input_subscription
+      extra_opts['window_size_sec'] = int(row_opts.window_size_sec or 60)
       extra_opts['trigger_interval_sec'] = int(
-          self.pipeline.get_option('trigger_interval_sec') or 30)
-    else:
-      extra_opts['input_file'] = self.pipeline.get_option('input_file')
+          row_opts.trigger_interval_sec or 30)
+    elif row_opts.input_file:
+      extra_opts['input_file'] = row_opts.input_file
 
-    for opt in ['output_table', 'model_path', 'feature_columns']:
-      val = self.pipeline.get_option(opt)
-      if val:
-        extra_opts[opt] = val
+    if row_opts.output_table:
+      extra_opts['output_table'] = row_opts.output_table
+    if row_opts.model_path:
+      extra_opts['model_path'] = row_opts.model_path
+    if row_opts.feature_columns:
+      extra_opts['feature_columns'] = row_opts.feature_columns
 
     self.result = table_row_inference.run(
         self.pipeline.get_full_options_as_args(**extra_opts),
