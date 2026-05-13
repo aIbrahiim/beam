@@ -66,9 +66,10 @@ jobs:
         uses: ./.github/actions/gradle-command-self-hosted-action
         with:
           gradle-command: :release:runJavaExamplesValidationTask
-          arguments: |
-            -Pver='${{ github.event.inputs.RELEASE }}' \
-            -Prepourl='${{ github.event.inputs.SNAPSHOT_URL }}' \
+          retry-count: '3'
+          arguments: >-
+            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RELEASE != '' && format('-Pver={0}', github.event.inputs.RELEASE) || '' }}
+            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.SNAPSHOT_URL != '' && format('-Prepourl={0}', github.event.inputs.SNAPSHOT_URL) || '' }}
             -PmavenLocalPath='${{ steps.setup_local_maven.outputs.NEW_TEMP_DIR }}'
       - name: Clean up local maven
         if: steps.setup_local_maven.outcome == 'success'
