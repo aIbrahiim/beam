@@ -30,6 +30,7 @@
     <beam.version>@project.version@</beam.version>
 
     <bigquery.version>@bigquery.version@</bigquery.version>
+    <libraries-bom.version>@libraries-bom.version@</libraries-bom.version>
     <hamcrest.version>@hamcrest.version@</hamcrest.version>
     <jackson.version>@jackson.version@</jackson.version>
     <joda.version>@joda.version@</joda.version>
@@ -458,6 +459,13 @@
         <groupId>org.apache.beam</groupId>
         <artifactId>beam-sdks-java-google-cloud-platform-bom</artifactId>
         <version>${beam.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>${libraries-bom.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

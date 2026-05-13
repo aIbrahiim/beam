@@ -29,6 +29,7 @@ processResources {
     filter org.apache.tools.ant.filters.ReplaceTokens, tokens: [
             'project.version':  version,
             'bigquery.version': dependencies.create(project.library.java.google_api_services_bigquery).getVersion(),
+            'libraries-bom.version': dependencies.create(project.library.java.google_cloud_platform_libraries_bom).getVersion(),
             'hamcrest.version': dependencies.create(project.library.java.hamcrest).getVersion(),
             'jackson.version': dependencies.create(project.library.java.jackson_core).getVersion(),
             'joda.version': dependencies.create(project.library.java.joda_time).getVersion(),

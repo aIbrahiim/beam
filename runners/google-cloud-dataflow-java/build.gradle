@@ -918,6 +918,14 @@ createJavaExamplesArchetypeValidationTask(type: 'MobileGaming',
   bqDataset: bqDataset,
   pubsubTopic: pubsubTopic)
 
+tasks.named('runMobileGamingJavaDataflow').configure {
+  mustRunAfter tasks.named('runQuickstartJavaDataflow')
+}
+tasks.named('runMobileGamingJavaDataflowBom').configure {
+  mustRunAfter tasks.named('runQuickstartJavaDataflow')
+  mustRunAfter tasks.named('runMobileGamingJavaDataflow')
+}
+
 // Standalone task for testing GCS upload, use with -PfilesToStage and -PgcpTempRoot.
 task GCSUpload(type: JavaExec) {
   mainClass = 'org.apache.beam.runners.dataflow.util.GCSUploadMain'
