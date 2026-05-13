@@ -35,7 +35,6 @@ import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.coders.TimestampPrefixingWindowCoder;
 import org.apache.beam.sdk.coders.VarLongCoder;
 import org.apache.beam.sdk.options.PipelineOptions;
-import org.apache.beam.sdk.options.StreamingOptions;
 import org.apache.beam.sdk.schemas.SchemaCoder;
 import org.apache.beam.sdk.transforms.windowing.GlobalWindow;
 import org.apache.beam.sdk.transforms.windowing.IntervalWindow.IntervalWindowCoder;
@@ -140,8 +139,7 @@ public class ModelCoderRegistrar implements CoderTranslatorRegistrar {
 
   @Override
   public boolean isKnownCoder(Coder<?> coder, PipelineOptions options) {
-    if (coder.getClass() == SchemaCoder.class
-        && StreamingOptions.updateCompatibilityVersionLessThan(options, "2.74")) {
+    if (coder.getClass() == SchemaCoder.class) {
       return false;
     }
     return BEAM_MODEL_CODER_URNS.containsKey(coder.getClass());
