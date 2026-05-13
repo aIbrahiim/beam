@@ -30,7 +30,6 @@
     <beam.version>@project.version@</beam.version>
 
     <bigquery.version>@bigquery.version@</bigquery.version>
-    <google-api-client.version>@google-api-client.version@</google-api-client.version>
     <guava.version>@guava.version@</guava.version>
     <hamcrest.version>@hamcrest.version@</hamcrest.version>
     <jackson.version>@jackson.version@</jackson.version>
@@ -352,7 +351,6 @@
     <dependency>
       <groupId>com.google.api-client</groupId>
       <artifactId>google-api-client</artifactId>
-      <version>${google-api-client.version}</version>
       <exclusions>
         <!-- Exclude an old version of guava that is being pulled
              in by a transitive dependency of google-api-client -->
