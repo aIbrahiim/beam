@@ -2618,7 +2618,7 @@ class BeamModulePlugin implements Plugin<Project> {
         argsNeeded.add("--pubsubTopic=${config.pubsubTopic}")
       }
       if (sharedMavenLocal) {
-        argsNeeded.add("--mavenLocalPath=${sharedMavenLocal}")
+        argsNeeded.add("--mavenLocalPath=${sharedMavenLocal}/${taskName}")
       }
       project.evaluationDependsOn(':release')
       project.task(taskName, dependsOn: ':release:classes', type: JavaExec) {
