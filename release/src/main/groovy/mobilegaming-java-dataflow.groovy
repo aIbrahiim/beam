@@ -152,8 +152,6 @@ class LeaderBoardRunner {
       }
     }
 
-    t.run("gcloud dataflow jobs list | grep pyflow-wordstream-candidate | grep Running | cut -d' ' -f1")
-
     // verify outputs in BQ tables
     def startTime = System.currentTimeMillis()
     def isSuccess = false
