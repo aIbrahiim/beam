@@ -71,6 +71,8 @@ jobs:
             ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RELEASE != '' && format('-Pver={0}', github.event.inputs.RELEASE) || '' }}
             ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.SNAPSHOT_URL != '' && format('-Prepourl={0}', github.event.inputs.SNAPSHOT_URL) || '' }}
             -PmavenLocalPath='${{ steps.setup_local_maven.outputs.NEW_TEMP_DIR }}'
+            --stacktrace
+            --info
       - name: Clean up local maven
         if: steps.setup_local_maven.outcome == 'success'
         run: rm -rf '${{ steps.setup_local_maven.outputs.NEW_TEMP_DIR }}'
