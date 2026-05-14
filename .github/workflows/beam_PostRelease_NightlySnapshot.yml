@@ -68,8 +68,8 @@ jobs:
           gradle-command: :release:runJavaExamplesValidationTask
           retry-count: '3'
           arguments: >-
-            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RELEASE != '' && format('-Pver={0}', github.event.inputs.RELEASE) || '' }}
-            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.SNAPSHOT_URL != '' && format('-Prepourl={0}', github.event.inputs.SNAPSHOT_URL) || '' }}
+            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.RELEASE != '' && github.event.inputs.RELEASE != '2.XX.0' && format('-Pver={0}', github.event.inputs.RELEASE) || '' }}
+            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.SNAPSHOT_URL != '' && !contains(github.event.inputs.SNAPSHOT_URL, 'orgapachebeam-NNNN') && format('-Prepourl={0}', github.event.inputs.SNAPSHOT_URL) || '' }}
             -PmavenLocalPath='${{ steps.setup_local_maven.outputs.NEW_TEMP_DIR }}'
             --stacktrace
             --info
