@@ -112,7 +112,19 @@ public class PubsubToIcebergIT implements Serializable {
                 .put("gcp_location", "us-central1")
                 .put("warehouse", warehouse)
                 .build(),
-            new Configuration());
+            hadoopConfForWarehouseGcs());
+  }
+
+  /**
+   * BQMS table ops use Iceberg's Hadoop {@code FileSystem} paths under the warehouse (gs://).
+   * Default {@link Configuration} does not register the {@code gs} scheme; wire the GCS connector
+   * explicitly (see {@code testImplementation library.java.bigdataoss_gcs_connector}).
+   */
+  private static Configuration hadoopConfForWarehouseGcs() {
+    Configuration conf = new Configuration();
+    conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
+    conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS");
+    return conf;
   }
 
   private String tableIdentifier;
