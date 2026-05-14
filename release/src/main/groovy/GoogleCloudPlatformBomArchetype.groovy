@@ -19,7 +19,15 @@
 class GoogleCloudPlatformBomArchetype {
     def static generate(TestScripts t) {
         // Generate a maven project from the snapshot repository
-        String output_text = t.run """mvn archetype:generate \
+        String output_text = t.run """mvn \
+      -Dmaven.wagon.http.retryHandler.class=default \
+      -Dmaven.wagon.http.retryHandler.count=10 \
+      -Dmaven.wagon.http.pool=false \
+      -Dmaven.wagon.httpconnectionManager.ttlSeconds=120 \
+      -Dmaven.wagon.http.connectionTimeout=120000 \
+      -Dmaven.wagon.http.readTimeout=120000 \
+      -Dhttp.keepAlive=false \
+      archetype:generate \
       --update-snapshots \
       -DarchetypeGroupId=org.apache.beam \
       -DarchetypeArtifactId=beam-sdks-java-maven-archetypes-gcp-bom-examples \
