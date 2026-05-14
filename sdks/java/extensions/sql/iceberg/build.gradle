@@ -51,6 +51,8 @@ dependencies {
   testImplementation "org.apache.iceberg:iceberg-core:1.9.2"
   testImplementation project(":sdks:java:io:google-cloud-platform")
   testImplementation project(":sdks:java:extensions:google-cloud-platform-core")
+  // GCS Hadoop FileSystem for BQMS / Iceberg paths on gs:// (e.g. PubsubToIcebergIT cleanup).
+  testRuntimeOnly library.java.bigdataoss_gcs_connector
 }
 
 task integrationTest(type: Test) {
