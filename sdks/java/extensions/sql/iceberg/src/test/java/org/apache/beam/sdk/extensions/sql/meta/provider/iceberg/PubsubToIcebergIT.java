@@ -48,6 +48,7 @@ import org.apache.beam.sdk.util.Sleeper;
 import org.apache.beam.sdk.values.Row;
 import org.apache.beam.vendor.guava.v32_1_2_jre.com.google.common.collect.ImmutableList;
 import org.apache.beam.vendor.guava.v32_1_2_jre.com.google.common.collect.ImmutableMap;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Table;
@@ -111,7 +112,7 @@ public class PubsubToIcebergIT implements Serializable {
                 .put("gcp_location", "us-central1")
                 .put("warehouse", warehouse)
                 .build(),
-            null);
+            new Configuration());
   }
 
   private String tableIdentifier;
