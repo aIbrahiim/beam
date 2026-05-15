@@ -48,7 +48,6 @@ import org.apache.beam.sdk.util.Sleeper;
 import org.apache.beam.sdk.values.Row;
 import org.apache.beam.vendor.guava.v32_1_2_jre.com.google.common.collect.ImmutableList;
 import org.apache.beam.vendor.guava.v32_1_2_jre.com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Table;
@@ -77,6 +76,7 @@ public class PubsubToIcebergIT implements Serializable {
   private static final BigqueryClient BQ_CLIENT = new BigqueryClient("PubsubToIcebergIT");
   private static final String BQMS_CATALOG =
       "org.apache.iceberg.gcp.bigquery.BigQueryMetastoreCatalog";
+  private static final String GCS_FILE_IO = "org.apache.iceberg.gcp.gcs.GCSFileIO";
   static final String DATASET = "sql_pubsub_to_iceberg_it_" + System.nanoTime();
   static String warehouse;
   private static Catalog icebergCatalog;
@@ -98,7 +98,7 @@ public class PubsubToIcebergIT implements Serializable {
             + "TYPE iceberg \n"
             + "PROPERTIES (\n"
             + format("  'catalog-impl' = '%s', \n", BQMS_CATALOG)
-            + "  'io-impl' = 'org.apache.iceberg.gcp.gcs.GCSFileIO', \n"
+            + format("  'io-impl' = '%s', \n", GCS_FILE_IO)
             + format("  'warehouse' = '%s', \n", warehouse)
             + format("  'gcp_project' = '%s', \n", OPTIONS.getProject())
             + "  'gcp_region' = 'us-central1')";
@@ -111,20 +111,10 @@ public class PubsubToIcebergIT implements Serializable {
                 .put("gcp_project", OPTIONS.getProject())
                 .put("gcp_location", "us-central1")
                 .put("warehouse", warehouse)
+                // Must match SQL DDL; without this BQMS defaults to HadoopFileIO on gs:// paths.
+                .put("io-impl", GCS_FILE_IO)
                 .build(),
-            hadoopConfForWarehouseGcs());
-  }
-
-  /**
-   * BQMS table ops use Iceberg's Hadoop {@code FileSystem} paths under the warehouse (gs://).
-   * Default {@link Configuration} does not register the {@code gs} scheme; wire the GCS connector
-   * explicitly (see {@code testImplementation library.java.bigdataoss_gcs_connector}).
-   */
-  private static Configuration hadoopConfForWarehouseGcs() {
-    Configuration conf = new Configuration();
-    conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
-    conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS");
-    return conf;
+            null);
   }
 
   private String tableIdentifier;
@@ -138,7 +128,11 @@ public class PubsubToIcebergIT implements Serializable {
 
   @After
   public void cleanup() {
-    icebergCatalog.dropTable(TableIdentifier.parse(tableIdentifier));
+    // Drop via BigQuery so teardown does not touch Hadoop gs:// (BQMS dropTable uses HadoopFileIO).
+    String[] parts = tableIdentifier.split("\\.", 2);
+    if (parts.length == 2) {
+      BQ_CLIENT.deleteTable(OPTIONS.getProject(), parts[0], parts[1]);
+    }
   }
 
   @AfterClass
