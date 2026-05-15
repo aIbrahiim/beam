@@ -164,27 +164,31 @@ class TestScripts {
      System.exit(0)
    }
 
-   // Run a single command, capture output, verify return code is 0
-   private String _execute(String cmd) {
+   /** Runs a shell command; returns [exitCode, combined stdout/stderr text]. */
+   private List _executeAllowFailure(String cmd) {
      def shell = "sh -c cmd".split(' ')
      shell[2] = cmd
      def pb = new ProcessBuilder(shell)
      pb.directory(var.curDir)
      pb.redirectErrorStream(true)
      def proc = pb.start()
-     String output_text = ""
      def text = new StringBuilder()
      proc.inputStream.eachLine {
        println it
        text.append(it + "\n")
      }
      proc.waitFor()
-     output_text = text.toString().trim()
-     if (proc.exitValue() != 0) {
-       println output_text
+     [proc.exitValue(), text.toString().trim()]
+   }
+
+   // Run a single command, capture output, verify return code is 0
+   private String _execute(String cmd) {
+     def result = _executeAllowFailure(cmd)
+     if (result[0] != 0) {
+       println result[1]
        error("Failed command")
      }
-     return output_text
+     return result[1]
    }
 
    // Change directory
@@ -208,21 +212,37 @@ class TestScripts {
      settings.write """
        <settings>
          <localRepository>${m2.absolutePath}</localRepository>
-           <profiles>
-             <profile>
-               <id>testrel</id>
-                 <repositories>
-                   <repository>
-                     <id>test.release</id>
-                     <url>${var.repoUrl}</url>
-                   </repository>
-                 </repositories>
-               </profile>
-             </profiles>
-        </settings>
+         <profiles>
+           <profile>
+             <id>testrel</id>
+             <repositories>
+               <repository>
+                 <id>test.release</id>
+                 <url>${var.repoUrl}</url>
+                 <releases><enabled>true</enabled></releases>
+                 <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>
+               </repository>
+             </repositories>
+             <pluginRepositories>
+               <pluginRepository>
+                 <id>test.release</id>
+                 <url>${var.repoUrl}</url>
+                 <releases><enabled>true</enabled></releases>
+                 <snapshots><enabled>true</enabled><updatePolicy>always</updatePolicy></snapshots>
+               </pluginRepository>
+             </pluginRepositories>
+           </profile>
+         </profiles>
+       </settings>
          """
      }
-     def cmd = "mvn ${args} -s ${settings.absolutePath} -Ptestrel -B"
+     // Longer timeouts for repository.apache.org; matches quickstart/dataflow mvn invocations.
+     def mavenGlobalOpts = "-Daether.connector.connectTimeout=300000 " +
+       "-Daether.connector.requestTimeout=600000 " +
+       "-Dmaven.wagon.http.connectionTimeout=300000 " +
+       "-Dmaven.wagon.http.readTimeout=600000 " +
+       "-Dmaven.wagon.http.retryHandler.count=10 "
+     def cmd = "mvn ${mavenGlobalOpts}${args} -s ${settings.absolutePath} -Ptestrel -B"
      String path = System.getenv("PATH");
      // Set the path on jenkins executors to use a recent maven
      // MAVEN_HOME is not set on some executors, so default to 3.5.2
@@ -230,7 +250,35 @@ class TestScripts {
      println "Using maven ${maven_home}"
      def mvnPath = "${maven_home}/bin"
      def setPath = "export PATH=\"${mvnPath}:${path}\" && "
-     return _execute(setPath + cmd)
+     def fullCmd = setPath + cmd
+
+     final int maxAttempts = 5
+     final long backoffMs = 20000L
+     for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+       def result = _executeAllowFailure(fullCmd)
+       int exitCode = result[0] as int
+       String output = result[1] as String
+       if (exitCode == 0) {
+         return output
+       }
+       boolean retryable = output.contains("connect timed out") ||
+         output.contains("Connection timed out") ||
+         output.contains("Could not transfer") ||
+         output.contains("Read timed out") ||
+         output.contains("Failed to connect") ||
+         output.contains("Connection reset") ||
+         output.contains("SocketTimeoutException")
+       if (!retryable || attempt == maxAttempts) {
+         if (output.contains("connect timed out") || output.contains("Could not transfer")) {
+           println "Maven could not reach ${var.repoUrl}. Check runner network access to repository.apache.org."
+         }
+         println output
+         error("Failed command")
+       }
+       println "Retryable Maven network failure (attempt ${attempt} of ${maxAttempts}); waiting ${backoffMs} ms..."
+       Thread.sleep(backoffMs)
+     }
+     return ""
    }
 
    // Clean up and report error

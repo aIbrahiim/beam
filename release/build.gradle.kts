@@ -47,3 +47,23 @@ task("runJavaExamplesValidationTask") {
   }
   dependsOn(":runners:google-cloud-dataflow-java:runMobileGamingJavaDataflowBom")
 }
+
+// Validations share -PmavenLocalPath and hit the same Apache snapshot repo; serialize when
+// org.gradle.parallel=true so Maven does not run concurrently against one local repository.
+gradle.projectsEvaluated {
+  val ordering = listOf(
+    ":runners:direct-java:runQuickstartJavaDirect",
+    ":runners:google-cloud-dataflow-java:runQuickstartJavaDataflow",
+    ":runners:spark:3:runQuickstartJavaSpark",
+    ":runners:flink:2.0:runQuickstartJavaFlinkLocal",
+    ":runners:direct-java:runMobileGamingJavaDirect",
+    ":runners:google-cloud-dataflow-java:runMobileGamingJavaDataflow",
+    ":runners:google-cloud-dataflow-java:runMobileGamingJavaDataflowBom",
+  )
+  var previous: Task? = null
+  for (path in ordering) {
+    val t = rootProject.tasks.findByPath(path) ?: continue
+    previous?.let { t.mustRunAfter(it) }
+    previous = t
+  }
+}

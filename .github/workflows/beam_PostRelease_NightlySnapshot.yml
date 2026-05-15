@@ -48,6 +48,8 @@ env:
     DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GE_CACHE_USERNAME }}
     GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GE_CACHE_PASSWORD }}
+    # Same snapshot repo Beam publishes to (see BeamModulePlugin distMgmtSnapshotsUrl).
+    APACHE_SNAPSHOT_REPO: ${{ github.event.inputs.SNAPSHOT_URL || 'https://repository.apache.org/content/repositories/snapshots/' }}
 
 jobs:
   beam_PostRelease_NightlySnapshot:
@@ -62,14 +64,25 @@ jobs:
       - name: Setup temp local maven
         id: setup_local_maven
         run: echo "NEW_TEMP_DIR=$(mktemp -d)" >> $GITHUB_OUTPUT
+      - name: Set Beam version for validation
+        id: beam_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && \
+             [ -n "${{ github.event.inputs.RELEASE }}" ] && \
+             [ "${{ github.event.inputs.RELEASE }}" != "2.XX.0" ]; then
+            echo "VER_ARG=-Pver=${{ github.event.inputs.RELEASE }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "VER_ARG=" >> "$GITHUB_OUTPUT"
+          fi
       - name: run PostRelease validation script
         uses: ./.github/actions/gradle-command-self-hosted-action
         with:
           gradle-command: :release:runJavaExamplesValidationTask
+          max-workers: 1
           arguments: |
-            -Pver='${{ github.event.inputs.RELEASE }}' \
-            -Prepourl='${{ github.event.inputs.SNAPSHOT_URL }}' \
-            -PmavenLocalPath='${{ steps.setup_local_maven.outputs.NEW_TEMP_DIR }}'
+            ${{ steps.beam_version.outputs.VER_ARG }}
+            -Prepourl=${{ env.APACHE_SNAPSHOT_REPO }}
+            -PmavenLocalPath=${{ steps.setup_local_maven.outputs.NEW_TEMP_DIR }}
       - name: Clean up local maven
         if: steps.setup_local_maven.outcome == 'success'
         run: rm -rf '${{ steps.setup_local_maven.outputs.NEW_TEMP_DIR }}'

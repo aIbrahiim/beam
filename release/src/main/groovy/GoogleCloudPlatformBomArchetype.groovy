@@ -21,6 +21,7 @@ class GoogleCloudPlatformBomArchetype {
         // Generate a maven project from the snapshot repository
         String output_text = t.run """mvn archetype:generate \
       --update-snapshots \
+      -DarchetypeCatalog=internal \
       -DarchetypeGroupId=org.apache.beam \
       -DarchetypeArtifactId=beam-sdks-java-maven-archetypes-gcp-bom-examples \
       -DarchetypeVersion=${t.ver()} \
