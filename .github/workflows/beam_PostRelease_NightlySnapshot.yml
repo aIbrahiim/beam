@@ -19,12 +19,17 @@ on:
   workflow_dispatch:
     inputs:
       RELEASE:
-        description: Beam version of current release (e.g. 2.XX.0)
-        required: true
-        default: '2.XX.0'
+        description: >-
+          Beam version to validate (e.g. 2.73.0 for an RC). Leave empty to use the
+          version from gradle.properties (nightly snapshot validation, same as schedule).
+        required: false
+        default: ''
       SNAPSHOT_URL:
-        description: Location of the staged artifacts in Maven central (https://repository.apache.org/content/repositories/orgapachebeam-NNNN/).
-        required: true
+        description: >-
+          Maven repository URL. Leave empty for Apache snapshots (nightly, same as schedule).
+          For RC validation use the staging repo (https://repository.apache.org/content/repositories/orgapachebeam-NNNN/).
+        required: false
+        default: 'https://repository.apache.org/content/repositories/snapshots/'
   schedule:
     - cron: '15 16 * * *'
 
@@ -68,8 +73,7 @@ jobs:
         id: beam_version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && \
-             [ -n "${{ github.event.inputs.RELEASE }}" ] && \
-             [ "${{ github.event.inputs.RELEASE }}" != "2.XX.0" ]; then
+             [ -n "${{ github.event.inputs.RELEASE }}" ]; then
             echo "VER_ARG=-Pver=${{ github.event.inputs.RELEASE }}" >> "$GITHUB_OUTPUT"
           else
             echo "VER_ARG=" >> "$GITHUB_OUTPUT"
