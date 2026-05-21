@@ -50,6 +50,7 @@ GH_NUMBER_OF_WORKFLOW_RUNS_TO_FETCH = os.environ["GH_NUMBER_OF_WORKFLOW_RUNS_TO_
 GIT_ORG = "apache"
 GIT_PATH = ".github/workflows"
 GIT_FILESYSTEM_PATH = "/tmp/git"
+CANCELLED_FAILURE_MIN_DURATION = timedelta(hours=1)
 
 
 class Workflow:
@@ -67,12 +68,66 @@ class Workflow:
 
 
 class WorkflowRun:
-    def __init__(self, id, status, url, workflow_id, started_at):
+    def __init__(
+        self,
+        id,
+        status,
+        url,
+        workflow_id,
+        started_at,
+        event=None,
+        updated_at=None,
+        jobs_count=None,
+    ):
         self.id = id
         self.status = status
         self.url = url
         self.workflow_id = workflow_id
         self.started_at = started_at
+        self.event = event
+        self.updated_at = updated_at
+        self.jobs_count = jobs_count
+
+
+def run_duration(started_at, updated_at):
+    end = updated_at if updated_at is not None else started_at
+    return end - started_at
+
+
+def resolve_flakiness_status(event, status, started_at, updated_at, jobs_count=None):
+    if event == "pull_request" and status == "cancelled":
+        return None
+
+    if event == "schedule" and status == "cancelled":
+        if run_duration(started_at, updated_at) > CANCELLED_FAILURE_MIN_DURATION:
+            return "failure"
+        if jobs_count == 0:
+            return "failure"
+        return None
+
+    return status
+
+
+def prepare_workflow_runs_for_flakiness(runs):
+    prepared_runs = []
+    for run in runs:
+        status = resolve_flakiness_status(
+            run.event, run.status, run.started_at, run.updated_at, run.jobs_count
+        )
+        if status is None:
+            print(
+                f"Skipping run {run.id} for flakiness check "
+                f"(event={run.event}, status={run.status})"
+            )
+            continue
+        if status != run.status:
+            print(
+                f"Treating run {run.id} as {status} for flakiness check "
+                f"(event={run.event}, status={run.status})"
+            )
+            run.status = status
+        prepared_runs.append(run)
+    return prepared_runs
 
 
 def clone_git_beam_repo(dest_path):
@@ -148,6 +203,44 @@ def enhance_workflow(workflow):
         print(f"No yaml file found for workflow: {workflow.name}")
 
 
+async def enrich_cancelled_schedule_run_jobs(workflows, semaphore, headers):
+    tasks = []
+    for workflow in workflows:
+        for run in workflow.runs:
+            if run.event != "schedule" or run.status != "cancelled":
+                continue
+            if run_duration(run.started_at, run.updated_at) > CANCELLED_FAILURE_MIN_DURATION:
+                continue
+            jobs_url = (
+                f"https://api.github.com/repos/{GIT_ORG}/beam/actions/runs/{run.id}/jobs"
+            )
+            tasks.append(fetch_jobs_count(jobs_url, run, semaphore, headers))
+
+    if tasks:
+        await asyncio.gather(*tasks)
+
+
+@backoff.on_exception(backoff.constant, aiohttp.ClientResponseError, max_tries=5)
+async def fetch_jobs_count(url, run, semaphore, headers):
+    async with semaphore:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    run.jobs_count = result.get("total_count", 0)
+                    return
+                if response.status == 403:
+                    print(f"Retry for: {url}")
+                    headers["Authorization"] = get_token()
+                raise aiohttp.ClientResponseError(
+                    response.request_info,
+                    response.history,
+                    status=response.status,
+                    message=response.reason,
+                    headers=response.headers,
+                )
+
+
 async def check_workflow_flakiness(workflow):
     def filter_workflow_runs(run, issue):
         closed_at = datetime.strptime(issue["closed_at"], "%Y-%m-%dT%H:%M:%SZ")
@@ -159,7 +252,9 @@ async def check_workflow_flakiness(workflow):
         return False
 
     one_month_ago_datetime = datetime.now() - timedelta(days=30)
-    workflow_runs = [run for run in workflow.runs if run.started_at > one_month_ago_datetime]
+    workflow_runs = [
+        run for run in workflow.runs if run.started_at > one_month_ago_datetime
+    ]
 
     url = f"https://api.github.com/repos/{GIT_ORG}/beam/issues"
     headers = {"Authorization": get_token()}
@@ -182,7 +277,7 @@ async def check_workflow_flakiness(workflow):
 
     success_rate = 1.0
     if len(workflow_runs):
-        failed_runs = list(filter(lambda r: r.status == "failure" | r.status == "cancelled", workflow_runs))
+        failed_runs = [run for run in workflow_runs if run.status == "failure"]
         print(f"Number of failed workflow runs: {len(failed_runs)}")
         success_rate -= len(failed_runs) / len(workflow_runs)
 
@@ -292,12 +387,19 @@ async def fetch_workflow_runs():
                     status = run["conclusion"]
                 else:
                     status = run["status"]
+                updated_at = None
+                if run.get("updated_at"):
+                    updated_at = datetime.strptime(
+                        run["updated_at"], "%Y-%m-%dT%H:%M:%SZ"
+                    )
                 workflow_run = WorkflowRun(
                     run["id"],
                     status,
                     run["html_url"],
                     workflow.id,
                     datetime.strptime(run["run_started_at"], "%Y-%m-%dT%H:%M:%SZ"),
+                    event=run.get("event"),
+                    updated_at=updated_at,
                 )
                 if workflow_runs.get(workflow_run.id):
                     print(
@@ -426,11 +528,15 @@ async def fetch_workflow_runs():
         page += 1
     print("Successfully fetched workflow runs details")
 
-    for workflow in list(workflows.values()):
+    workflows_list = list(workflows.values())
+    await enrich_cancelled_schedule_run_jobs(workflows_list, semaphore, headers)
+    for workflow in workflows_list:
         runs = sorted(workflow.runs, key=lambda r: r.started_at, reverse=True)
-        workflow.runs = runs[: int(GH_NUMBER_OF_WORKFLOW_RUNS_TO_FETCH)]
+        workflow.runs = prepare_workflow_runs_for_flakiness(
+            runs[: int(GH_NUMBER_OF_WORKFLOW_RUNS_TO_FETCH)]
+        )
 
-    return list(workflows.values())
+    return workflows_list
 
 
 def save_workflows(workflows):
