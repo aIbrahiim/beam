@@ -155,7 +155,7 @@ class DataflowCostBenchmark(LoadTest):
         page_token=page_token,
         minimum_importance='JOB_MESSAGE_DEBUG')
       for message in messages:
-        text = message.messageText
+        text = message.message_text
         if getattr(message, 'time', None):
           last_message_time = message.time
         if text:
@@ -306,8 +306,7 @@ class DataflowCostBenchmark(LoadTest):
   def _get_additional_metrics(self,
                               result: DataflowPipelineResult) -> dict[str, Any]:
     job_id = result.job_id()
-    job = self.dataflow_client.get_job(job_id)
-    project = job.projectId
+    project = self.project_id
     start_time, end_time = self._get_worker_time_interval(job_id)
     if not start_time or not end_time:
       logging.warning('Could not find valid worker start/end times.')
