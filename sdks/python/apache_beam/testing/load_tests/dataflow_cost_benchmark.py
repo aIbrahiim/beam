@@ -22,6 +22,7 @@ import time
 from datetime import datetime
 from typing import Any
 from typing import Optional
+from typing import Union
 
 from google.cloud import monitoring_v3
 from google.protobuf.duration_pb2 import Duration
@@ -141,7 +142,7 @@ class DataflowCostBenchmark(LoadTest):
     return system_metrics
 
   def _get_worker_time_interval(
-      self, job_id: str) -> tuple[Optional[str], Optional[str]]:
+      self, job_id: str) -> tuple[Optional[datetime], Optional[datetime]]:
     """Extracts worker start and stop times from job messages."""
     start_time, end_time = None, None
     page_token = None
@@ -186,8 +187,8 @@ class DataflowCostBenchmark(LoadTest):
       self,
       project: str,
       job_id: str,
-      start_time: str,
-      end_time: str,
+      start_time: Union[datetime, str],
+      end_time: Union[datetime, str],
       pcollection_name: Optional[str] = None,
   ) -> dict[str, float]:
     """Query Cloud Monitoring for per-PCollection throughput."""
@@ -256,7 +257,10 @@ class DataflowCostBenchmark(LoadTest):
     return metrics
 
   def _get_streaming_throughput_metrics(
-      self, project: str, start_time: str, end_time: str) -> dict[str, float]:
+      self,
+      project: str,
+      start_time: Union[datetime, str],
+      end_time: Union[datetime, str]) -> dict[str, float]:
     if not self.subscription:
       return {'AvgThroughputBytes': 0.0, 'AvgThroughputElements': 0.0}
 
@@ -297,10 +301,18 @@ class DataflowCostBenchmark(LoadTest):
       metrics[f"AvgThroughput{key}"] = avg_rate
     return metrics
 
-  def _get_job_runtime(self, start_time: str, end_time: str) -> float:
+  def _parse_message_time(self, value: Union[datetime, str]) -> datetime:
+    """Parse job message time from the new or legacy Dataflow client."""
+    if isinstance(value, datetime):
+      return value
+    return datetime.fromisoformat(value.rstrip('Z'))
+
+  def _get_job_runtime(
+      self, start_time: Union[datetime, str], end_time: Union[datetime, str]
+  ) -> float:
     """Calculates the job runtime duration in seconds."""
-    start_dt = datetime.fromisoformat(start_time[:-1])
-    end_dt = datetime.fromisoformat(end_time[:-1])
+    start_dt = self._parse_message_time(start_time)
+    end_dt = self._parse_message_time(end_time)
     return (end_dt - start_dt).total_seconds()
 
   def _get_additional_metrics(self,
