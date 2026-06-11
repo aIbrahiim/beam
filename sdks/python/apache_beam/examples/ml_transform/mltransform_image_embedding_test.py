@@ -77,7 +77,7 @@ class MLTransformImageEmbeddingTest(unittest.TestCase):
     self.assertEqual(output['model_name'], 'clip-ViT-B-32')
     self.assertEqual(output['embedding'], [0.1, 0.2, 0.3])
     self.assertEqual(output['embedding_dim'], 3)
-    self.assertIn('processed_ts_ms', output)
+    self.assertIn('infer_ms', output)
 
   def test_output_table_schema_marks_embedding_as_repeated(self):
     schema = bigquery_tools.get_dict_table_schema(

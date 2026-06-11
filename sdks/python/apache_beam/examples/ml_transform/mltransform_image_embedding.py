@@ -66,7 +66,7 @@ OUTPUT_TABLE_SCHEMA = {
             'name': 'embedding_dim', 'type': 'INT64'
         },
         {
-            'name': 'processed_ts_ms', 'type': 'INT64'
+            'name': 'infer_ms', 'type': 'INT64'
         },
     ]
 }
@@ -139,7 +139,7 @@ class FormatImageEmbeddingOutput(beam.DoFn):
         'model_name': self.model_name,
         'embedding': embedding,
         'embedding_dim': len(embedding),
-        'processed_ts_ms': now_millis(),
+        'infer_ms': now_millis(),
     }
 
 
