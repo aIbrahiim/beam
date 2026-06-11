@@ -66,7 +66,7 @@ OUTPUT_TABLE_SCHEMA = {
             'name': 'embedding_dim', 'type': 'INT64'
         },
         {
-            'name': 'infer_ms', 'type': 'INT64'
+            'name': 'processed_ts_ms', 'type': 'INT64'
         },
     ]
 }
@@ -122,7 +122,7 @@ def _as_dict(row: Any) -> dict[str, Any]:
 
 def embedding_to_list(value: Any) -> list[float]:
   if hasattr(value, 'tolist'):
-    value = value.tolist()
+    return value.tolist()
   return [float(item) for item in value]
 
 
@@ -139,7 +139,7 @@ class FormatImageEmbeddingOutput(beam.DoFn):
         'model_name': self.model_name,
         'embedding': embedding,
         'embedding_dim': len(embedding),
-        'infer_ms': now_millis(),
+        'processed_ts_ms': now_millis(),
     }
 
 
@@ -233,8 +233,8 @@ def run(
       pipeline
       | 'ReadImageURIs' >> beam.io.ReadFromText(known_args.input)
       | 'FilterEmptyURIs' >> beam.FlatMap(filter_empty_uri)
-      | 'ReadImages' >> beam.ParDo(ReadImage())
-      | 'ReshuffleBeforeEmbedding' >> beam.Reshuffle())
+      | 'ReshuffleBeforeEmbedding' >> beam.Reshuffle()
+      | 'ReadImages' >> beam.ParDo(ReadImage()))
   results = (
       rows
       | 'MLTransformImageEmbeddings' >> ml_transform
