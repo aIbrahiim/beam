@@ -14,13 +14,13 @@
 # limitations under the License.
 #
 
-# Requirements for mltransform_generate_vocab Dataflow workers.
-# Keep this aligned with MLTransform test requirements to reduce resolver
-# backtracking during benchmark setup.
-dill==0.4.1
-tfx_bsl==1.16.1
-tensorflow-transform==1.16.0
-numpy>=1.22.0,<2.0
-tensorflow-metadata>=1.16.1,<1.17.0
-pandas<2
+# Dataflow worker requirements for mltransform_generate_vocab load tests.
+# MLTransform TFT operations need a consistent TensorFlow Transform stack;
+# otherwise workers can crash-loop with pandas/numpy ABI mismatches.
 google-cloud-monitoring>=2.27.0
+tensorflow-transform==1.14.0
+tensorflow-metadata==1.14.0
+tfx-bsl==1.14.0
+numpy<2
+pandas<2
+dill
