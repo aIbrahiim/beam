@@ -22,5 +22,5 @@ tensorflow>=2.21,<2.22
 numpy>=1.22.0,<2.0
 tensorflow-metadata>=1.21.0,<1.22.0
 pyarrow>=14,<17
-tensorflow-serving-api>=2.20,<2.22
+tensorflow-serving-api>=2.19,<2.20
 tf-keras>=2.21,<2.22
