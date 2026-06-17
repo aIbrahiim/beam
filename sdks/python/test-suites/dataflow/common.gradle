@@ -605,7 +605,7 @@ task tftTests {
       executable 'sh'
       args '-c', ". ${envdir}/bin/activate && cd ${rootDir} && " +
           'TAG=$(date +%Y%m%d-%H%M%S%N) && ' +
-          "CONTAINER=us.gcr.io/\${PROJECT:-apache-beam-testing}/\$USER/${imageName} && " +
+          "CONTAINER=us.gcr.io/\${PROJECT:-apache-beam-testing}/\${USER:-github}/${imageName} && " +
           "docker tag apache/${imageName}:${project.sdk_version} \$CONTAINER:\$TAG && " +
           'gcloud docker -- push $CONTAINER:$TAG && ' +
           "cd sdks/python && ${runScriptsDir}/run_integration_test.sh " +
