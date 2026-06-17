@@ -591,7 +591,7 @@ task tftTests {
 
   doLast {
     def opts = project.findProperty('opts')
-    opts += " --sdk_location=${project.ext.sdkLocation}"
+    opts += " --sdk_location=container"
     def testOpts = basicPytestOpts + ["--numprocesses=8", "--dist=loadfile"]
     def argMap = [
         "test_opts": testOpts,
@@ -606,10 +606,12 @@ task tftTests {
       args '-c', ". ${envdir}/bin/activate && cd ${rootDir} && " +
           'TAG=$(date +%Y%m%d-%H%M%S%N) && ' +
           "CONTAINER=us.gcr.io/\${PROJECT:-apache-beam-testing}/\${USER:-github}/${imageName} && " +
+          "PREBUILD=us.gcr.io/\${PROJECT:-apache-beam-testing}/\${USER:-github}/prebuild_python${pyversion}_sdk && " +
           "docker tag apache/${imageName}:${project.sdk_version} \$CONTAINER:\$TAG && " +
+          'gcloud --quiet auth configure-docker us.gcr.io && ' +
           'gcloud docker -- push $CONTAINER:$TAG && ' +
           "cd sdks/python && ${runScriptsDir}/run_integration_test.sh " +
-          '--pipeline_opts "${TFT_PIPELINE_OPTS} --sdk_container_image=$CONTAINER:$TAG" ' +
+          '--pipeline_opts "${TFT_PIPELINE_OPTS} --sdk_container_image=$CONTAINER:$TAG --prebuild_sdk_container_engine=local_docker --docker_registry_push_url=$PREBUILD" ' +
           cmdArgs
     }
   }
