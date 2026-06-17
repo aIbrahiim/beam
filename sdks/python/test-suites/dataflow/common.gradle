@@ -571,14 +571,23 @@ task installTFTRequirements {
     exec {
       workingDir "$rootProject.projectDir/sdks/python/apache_beam/testing/benchmarks/cloudml/"
       executable 'sh'
-      args '-c', ". ${envdir}/bin/activate && pip install -r requirements.txt"
+      // installGcpTest already installed apache-beam[gcp]. tfx_bsl and
+      // tensorflow-transform can trigger re-resolution of the GCP extra and hit
+      // ResolutionTooDeep, so install both with --no-deps.
+      args '-c', ". ${envdir}/bin/activate && " +
+          "grep -Ev '^(tfx_bsl|tensorflow-transform)' requirements.txt > /tmp/cloudml_tft_base_requirements.txt && " +
+          "pip install -r /tmp/cloudml_tft_base_requirements.txt && " +
+          "pip install --no-deps tfx_bsl==1.16.1 tensorflow-transform==1.16.0"
     }
   }
 }
 
 // Tensorflow transform integration and benchmarking tests on Apache Beam.
 task tftTests {
+  def pyversion = "${project.ext.pythonVersion.replace('.', '')}"
+  def imageName = "${project.docker_image_default_repo_prefix}python${project.ext.pythonVersion}_sdk"
   dependsOn "installTFTRequirements"
+  dependsOn ":sdks:python:container:py${pyversion}:docker"
 
   doLast {
     def opts = project.findProperty('opts')
@@ -589,12 +598,19 @@ task tftTests {
         "suite": "TFTransformTests-df${pythonVersionSuffix}",
         "collect": "uses_tft",
         "requirements_file": "apache_beam/testing/benchmarks/cloudml/requirements.txt",
-        "pipeline_opts": opts,
     ]
     def cmdArgs = mapToArgString(argMap)
     exec {
+      environment 'TFT_PIPELINE_OPTS', opts
       executable 'sh'
-      args '-c', ". ${envdir}/bin/activate && ${runScriptsDir}/run_integration_test.sh $cmdArgs "
+      args '-c', ". ${envdir}/bin/activate && cd ${rootDir} && " +
+          'TAG=$(date +%Y%m%d-%H%M%S%N) && ' +
+          "CONTAINER=us.gcr.io/\${PROJECT:-apache-beam-testing}/\$USER/${imageName} && " +
+          "docker tag apache/${imageName}:${project.sdk_version} \$CONTAINER:\$TAG && " +
+          'gcloud docker -- push $CONTAINER:$TAG && ' +
+          "cd sdks/python && ${runScriptsDir}/run_integration_test.sh " +
+          '--pipeline_opts "${TFT_PIPELINE_OPTS} --sdk_container_image=$CONTAINER:$TAG" ' +
+          cmdArgs
     }
   }
 }
