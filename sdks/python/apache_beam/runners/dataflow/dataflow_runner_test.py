@@ -223,6 +223,27 @@ class DataflowRunnerTest(unittest.TestCase, ExtraAssertionsMixin):
             duration_failed_runner.job, duration_failed_runner, options)
         duration_failed_result.wait_until_finish(5000)
 
+    with self.assertRaisesRegex(DataflowRuntimeException,
+                                'Dataflow pipeline failed. State: CANCELLED'):
+      cancelling_runner = MockDataflowRunner([
+          values_enum.JOB_STATE_RUNNING,
+          values_enum.JOB_STATE_CANCELLING,
+          values_enum.JOB_STATE_CANCELLED,
+      ])
+      cancelling_result = DataflowPipelineResult(
+          cancelling_runner.job, cancelling_runner, options)
+      cancelling_result.wait_until_finish()
+
+    succeeded_cleanup_runner = MockDataflowRunner([
+        values_enum.JOB_STATE_RUNNING,
+        values_enum.JOB_STATE_RESOURCE_CLEANING_UP,
+        values_enum.JOB_STATE_DONE,
+    ])
+    succeeded_cleanup_result = DataflowPipelineResult(
+        succeeded_cleanup_runner.job, succeeded_cleanup_runner, options)
+    result = succeeded_cleanup_result.wait_until_finish()
+    self.assertEqual(result, PipelineState.DONE)
+
   @mock.patch('time.sleep', return_value=None)
   def test_cancel(self, patched_time_sleep):
     values_enum = dataflow_api.JobState

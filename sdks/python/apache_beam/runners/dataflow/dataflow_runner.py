@@ -151,6 +151,17 @@ class DataflowRunner(PipelineRunner):
       start_secs = time.time()
       duration_secs = duration // 1000
 
+    # Job states that indicate the job is still active or finishing. Aligns with
+    # Java MonitoringUtil#toState and PipelineLauncher.JobState#FINISHING_STATES.
+    _ACTIVE_OR_FINISHING_STATES = (
+        'JOB_STATE_RUNNING',
+        'JOB_STATE_PAUSED',
+        'JOB_STATE_PAUSING',
+        'JOB_STATE_DRAINING',
+        'JOB_STATE_CANCELLING',
+        'JOB_STATE_RESOURCE_CLEANING_UP',
+    )
+
     job_id = result.job_id()
     while True:
       response = runner.dataflow_client.get_job(job_id)
@@ -163,9 +174,7 @@ class DataflowRunner(PipelineRunner):
             state_update_callback(current_state)
           _LOGGER.info('Job %s is in state %s', job_id, current_state)
           last_job_state = current_state
-        if str(current_state) not in ('JOB_STATE_RUNNING',
-                                      'JOB_STATE_PAUSED',
-                                      'JOB_STATE_PAUSING'):
+        if str(current_state) not in _ACTIVE_OR_FINISHING_STATES:
           # Stop checking for new messages on timeout, explanatory
           # message received, success, or a terminal job state caused
           # by the user that therefore doesn't require explanation.
