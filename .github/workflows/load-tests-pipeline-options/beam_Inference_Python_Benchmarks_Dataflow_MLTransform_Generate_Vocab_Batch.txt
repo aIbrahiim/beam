@@ -27,6 +27,7 @@
 --worker_zone=us-central1-b
 --sdk_location=container
 --requirements_file=apache_beam/ml/transforms/mltransform_tests_requirements.txt
+--requirements_cache=skip
 --input_options={}
 --publish_to_big_query=true
 --metrics_dataset=beam_run_inference

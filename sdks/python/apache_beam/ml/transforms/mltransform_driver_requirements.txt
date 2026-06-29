@@ -15,9 +15,9 @@
 # limitations under the License.
 #
 
-# Dataflow worker requirements for MLTransform inference benchmarks.
-# Pair with --requirements_cache=skip so workers install native Linux wheels
-# at startup instead of cross-platform pip download during staging.
+# Driver-only requirements for MLTransform inference benchmarks.
+# Installed via uv in load_tests/build.gradle after apache-beam[gcp,test].
+# Use mltransform_tests_requirements.txt for Dataflow workers.
 dill==0.4.1
 tfx_bsl==1.16.1
 tensorflow-transform==1.16.0
@@ -28,3 +28,7 @@ pyarrow==10.0.1
 tensorflow-serving-api==2.16.1
 tf-keras==2.16.0
 google-cloud-monitoring>=2.27.0
+google-cloud-aiplatform==1.133.0
+google-api-core==2.19.1
+proto-plus==1.27.1
+protobuf==3.20.3
