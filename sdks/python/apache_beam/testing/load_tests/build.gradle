@@ -55,7 +55,10 @@ task run(type: Exec, dependsOn: installGcpTest) {
         exec {
           setWorkingDir "${project.rootDir}/sdks/python"
           executable 'sh'
-          args '-c', "${project.ext.envdir}/bin/python -m pip install -r ${requirementsTxtFileArg}"
+          // Use uv for requirements installs (same as installGcpTest). Plain pip
+          // can hit ResolutionTooDeep when reconciling TFT deps with apache-beam[gcp].
+          def uvCacheDir = "${project.ext.envdir}/.uv_cache"
+          args '-c', ". ${project.ext.envdir}/bin/activate && pip install uv && uv pip install --cache-dir \"${uvCacheDir}\" -r ${requirementsTxtFileArg}"
         }
      }
    }
