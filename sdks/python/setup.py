@@ -602,9 +602,9 @@ if __name__ == '__main__':
               # tests due to tag check introduced since pip 24.2
               # https://github.com/apache/beam/issues/31285
               # 'xgboost<2.0',  # https://github.com/apache/beam/issues/31252
-              # tft needs protobuf<5; tf2onnx 1.17+ allows protobuf 5 on the
-              # ADK-only path.
-              'tf2onnx>=1.16.1,<1.17',
+              # tft needs protobuf<5; tf2onnx 1.17+ supports protobuf 4.x
+              # required by google-cloud-dataflow-client in the gcp extra.
+              'tf2onnx>=1.17.0,<1.18',
           ] + ml_base_core,
           'p310_ml_test': [
             'datatable',
