@@ -1001,6 +1001,42 @@ class StagerTest(unittest.TestCase):
     self.assertEqual(
         requirements_cache_dir, captured_cmd_args[find_links_index + 1])
 
+  def test_is_pip_requirements_package_line(self):
+    self.assertTrue(
+        stager.Stager._is_pip_requirements_package_line('tfx_bsl==1.21.0'))
+    self.assertFalse(
+        stager.Stager._is_pip_requirements_package_line('--no-deps'))
+    self.assertFalse(
+        stager.Stager._is_pip_requirements_package_line('# comment'))
+    self.assertFalse(stager.Stager._is_pip_requirements_package_line(''))
+
+  def test_populate_requirements_cache_skips_pip_option_lines(self):
+    requirements_cache_dir = self.make_temp_dir()
+    source_dir = self.make_temp_dir()
+    requirements_file = os.path.join(source_dir, 'requirements.txt')
+    self.create_temp_file(requirements_file, '--no-deps\nsome_package==1.0.0\n')
+
+    captured_calls = []
+
+    def mock_check_output(cmd_args, **kwargs):
+      captured_calls.append(list(cmd_args))
+      return b''
+
+    with mock.patch(
+        'apache_beam.runners.portability.stager.processes.check_output',
+        side_effect=mock_check_output):
+      stager.Stager._populate_requirements_cache(
+          requirements_file, requirements_cache_dir)
+
+    download_packages = []
+    for cmd_args in captured_calls:
+      if 'download' in cmd_args:
+        find_links_index = cmd_args.index('--find-links')
+        download_packages.append(cmd_args[find_links_index + 2])
+    self.assertTrue(download_packages)
+    self.assertTrue(
+        all(pkg == 'some_package==1.0.0' for pkg in download_packages))
+
 
 class TestStager(stager.Stager):
   def stage_artifact(self, local_path_to_artifact, artifact_name, sha256):

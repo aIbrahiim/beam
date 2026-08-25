@@ -15,6 +15,9 @@
 #    limitations under the License.
 #
 
+# Extra TFT packages only. Do not resolve apache-beam from PyPI: tfx_bsl
+# depends on apache-beam[gcp] and would replace the SDK under test.
+--no-deps
 dill==0.4.1
 tfx_bsl==1.21.0
 tensorflow-transform==1.21.0
