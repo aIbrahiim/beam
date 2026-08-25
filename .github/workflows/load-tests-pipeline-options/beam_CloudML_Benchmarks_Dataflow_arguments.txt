@@ -21,3 +21,4 @@
 --temp_location=gs://temp-storage-for-perf-tests/loadtests
 --runner=DataflowRunner
 --requirements_file=apache_beam/testing/benchmarks/cloudml/requirements.txt
+--files_to_stage=apache_beam/testing/benchmarks/cloudml/constraints.txt

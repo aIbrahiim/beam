@@ -1005,7 +1005,7 @@ class StagerTest(unittest.TestCase):
     self.assertTrue(
         stager.Stager._is_pip_requirements_package_line('tfx_bsl==1.21.0'))
     self.assertFalse(
-        stager.Stager._is_pip_requirements_package_line('--no-deps'))
+        stager.Stager._is_pip_requirements_package_line('-c constraints.txt'))
     self.assertFalse(
         stager.Stager._is_pip_requirements_package_line('# comment'))
     self.assertFalse(stager.Stager._is_pip_requirements_package_line(''))
@@ -1014,7 +1014,8 @@ class StagerTest(unittest.TestCase):
     requirements_cache_dir = self.make_temp_dir()
     source_dir = self.make_temp_dir()
     requirements_file = os.path.join(source_dir, 'requirements.txt')
-    self.create_temp_file(requirements_file, '--no-deps\nsome_package==1.0.0\n')
+    self.create_temp_file(
+        requirements_file, '-c constraints.txt\nsome_package==1.0.0\n')
 
     captured_calls = []
 

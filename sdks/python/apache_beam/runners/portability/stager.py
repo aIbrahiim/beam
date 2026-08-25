@@ -714,7 +714,7 @@ class Stager(object):
     stripped = line.strip()
     if not stripped or stripped.startswith('#'):
       return False
-    # Options in requirements files (for example --no-deps) are not packages.
+    # Options in requirements files (for example -c constraints.txt) are not packages.
     return not stripped.startswith('-')
 
   @staticmethod
@@ -760,7 +760,8 @@ class Stager(object):
       download_dir = tempfile.mkdtemp(dir=temp_directory)
 
       # Read packages from the requirements file. Skip comments and pip
-      # options (for example --no-deps) so they are not passed to pip download.
+      # options (for example -c constraints.txt) so they are not passed to
+      # pip download.
       requirements = []
       with open(tmp_requirements_filepath, 'r') as f:
         for line in f:

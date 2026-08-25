@@ -15,16 +15,8 @@
 #    limitations under the License.
 #
 
-# Apply constraints so tfx_bsl cannot replace the SDK under test with a
-# different PyPI apache-beam. (--no-deps is not valid inside requirements
-# files; -c is.)
--c constraints.txt
-dill==0.4.1
-tfx_bsl==1.21.0
-tensorflow-transform==1.21.0
-tensorflow-metadata==1.21.0
-tensorflow
-numpy
-pyarrow
-tensorflow-serving-api
-tf-keras
+# Keep the staged/local SDK. tfx_bsl depends on apache-beam[gcp] and would
+# otherwise install a different PyPI Beam (for example 2.75.0) and fail the
+# construction/runtime environment check. Bound below the current master
+# line so PyPI 2.75.x cannot be selected.
+apache-beam>=2.76.0

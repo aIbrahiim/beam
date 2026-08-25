@@ -607,6 +607,8 @@ task tftTests {
   doLast {
     def opts = project.findProperty('opts')
     opts += " --sdk_location=${project.ext.sdkLocation}"
+    // Stage constraints next to requirements.txt so worker pip -c resolves.
+    opts += " --files_to_stage=apache_beam/testing/benchmarks/cloudml/constraints.txt"
     def testOpts = basicPytestOpts + ["--numprocesses=8", "--dist=loadfile"]
     def argMap = [
         "test_opts": testOpts,
