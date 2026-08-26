@@ -15,10 +15,6 @@
 #    limitations under the License.
 #
 
-# Apply constraints so tfx_bsl cannot replace the SDK under test with a
-# different PyPI apache-beam. (--no-deps is not valid inside requirements
-# files; -c is.)
--c constraints.txt
 dill==0.4.1
 tfx_bsl==1.21.0
 tensorflow-transform==1.21.0

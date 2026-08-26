@@ -709,15 +709,6 @@ class Stager(object):
     return tmp_requirements_filename
 
   @staticmethod
-  def _is_pip_requirements_package_line(line: str) -> bool:
-    """True if the line is a package spec, not a comment or pip option."""
-    stripped = line.strip()
-    if not stripped or stripped.startswith('#'):
-      return False
-    # Options in requirements files (for example -c constraints.txt) are not packages.
-    return not stripped.startswith('-')
-
-  @staticmethod
   def _extract_local_packages(requirements_file):
     local_deps = []
     pypi_deps = []
@@ -759,14 +750,12 @@ class Stager(object):
       # requirements file.
       download_dir = tempfile.mkdtemp(dir=temp_directory)
 
-      # Read packages from the requirements file. Skip comments and pip
-      # options (for example -c constraints.txt) so they are not passed to
-      # pip download.
+      # Read packages from the requirements file
       requirements = []
       with open(tmp_requirements_filepath, 'r') as f:
         for line in f:
           line = line.strip()
-          if Stager._is_pip_requirements_package_line(line):
+          if line and not line.startswith('#'):
             requirements.append(line)
 
       for req in requirements:
