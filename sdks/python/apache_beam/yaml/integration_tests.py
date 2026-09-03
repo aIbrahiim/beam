@@ -165,6 +165,102 @@ def temp_spanner_table(project, prefix='temp_spanner_db_'):
     spanner_client._delete_database()
 
 
+def _spanner_commit_timestamp_str(commit_ts):
+  """Format a Spanner commit timestamp for SchemaTransform config fields."""
+  text = commit_ts.isoformat()
+  if text.endswith('+00:00'):
+    return text[:-6] + 'Z'
+  return text
+
+
+@contextlib.contextmanager
+def temp_spanner_change_stream(
+    project='apache-beam-testing', instance='beam-test', num_rows=2):
+  """Context manager for a Spanner table with a change stream and seeded mutations.
+
+  Creates a temporary database, table, and change stream, then inserts, updates,
+  and deletes ``num_rows`` rows. Yields identifiers and inclusive ``start_at`` /
+  ``end_at`` timestamps suitable for a bounded ``ReadFromSpannerCDC`` YAML IT.
+
+  Args:
+    project (str): GCP project id.
+    instance (str): Spanner instance id.
+    num_rows (int): Number of rows to insert/update/delete.
+
+  Yields:
+    dict: Keys ``PROJECT``, ``INSTANCE``, ``DATABASE``, ``TABLE``,
+      ``CHANGE_STREAM``, ``START_AT``, and ``END_AT``.
+  """
+  from google.cloud import spanner
+
+  client = spanner.Client(project=project)
+  spanner_instance = client.instance(instance)
+  database_id = f'temp-{uuid.uuid4().hex[:10]}'
+  # Unquoted GSQL identifiers must start with a letter.
+  table = f'T{uuid.uuid4().hex[:10]}'
+  change_stream = f'C{uuid.uuid4().hex[:10]}'
+
+  database = spanner_instance.database(
+      database_id,
+      ddl_statements=[
+          f'''CREATE TABLE {table} (
+            SingerId INT64 NOT NULL,
+            FirstName STRING(1024),
+            LastName STRING(1024)
+          ) PRIMARY KEY (SingerId)'''
+      ])
+  logging.info(
+      'Creating Spanner CDC test database %s table %s', database_id, table)
+  database.create().result(timeout=600)
+
+  logging.info('Creating change stream %s for table %s', change_stream, table)
+  database.update_ddl([f'CREATE CHANGE STREAM {change_stream} FOR {table}'
+                       ]).result(timeout=600)
+
+  def _commit_mutation(build_batch_fn):
+    batch = database.batch()
+    build_batch_fn(batch)
+    return batch.commit()
+
+  start_at = None
+  for singer_id in range(1, num_rows + 1):
+    commit_ts = _commit_mutation(
+        lambda batch, singer_id=singer_id: batch.insert(
+            table=table, columns=('SingerId', 'FirstName', 'LastName'), values=[
+                (singer_id, f'First {singer_id}', f'Last {singer_id}'), ]))
+    if start_at is None:
+      start_at = commit_ts
+
+  for singer_id in range(1, num_rows + 1):
+    _commit_mutation(
+        lambda batch, singer_id=singer_id: batch.update(
+            table=table, columns=('SingerId', 'FirstName', 'LastName'), values=[
+                (
+                    singer_id,
+                    f'Updated First {singer_id}',
+                    f'Updated Last {singer_id}', ), ]))
+
+  end_at = None
+  for singer_id in range(1, num_rows + 1):
+    end_at = _commit_mutation(
+        lambda batch, singer_id=singer_id: batch.delete(
+            table=table, keyset=spanner.KeySet(keys=[[singer_id]])))
+
+  try:
+    yield {
+        'PROJECT': project,
+        'INSTANCE': instance,
+        'DATABASE': database_id,
+        'TABLE': table,
+        'CHANGE_STREAM': change_stream,
+        'START_AT': _spanner_commit_timestamp_str(start_at),
+        'END_AT': _spanner_commit_timestamp_str(end_at),
+    }
+  finally:
+    logging.info('Deleting Spanner CDC test database: %s', database_id)
+    database.drop()
+
+
 @contextlib.contextmanager
 def temp_bigquery_table(project, prefix='yaml_bq_it_'):
   """Context manager to create and clean up a temporary BigQuery dataset.

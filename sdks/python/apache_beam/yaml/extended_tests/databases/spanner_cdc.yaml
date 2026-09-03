@@ -1,0 +1,64 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+fixtures:
+  - name: SPANNER_CDC
+    type: "apache_beam.yaml.integration_tests.temp_spanner_change_stream"
+    config:
+      project: "apache-beam-testing"
+      instance: "beam-test"
+      num_rows: 2
+
+pipelines:
+  - name: read_spanner_cdc_bounded
+    pipeline:
+      type: composite
+      transforms:
+        - type: ReadFromSpannerCDC
+          name: ReadCdc
+          config:
+            project: "{SPANNER_CDC[PROJECT]}"
+            instance: "{SPANNER_CDC[INSTANCE]}"
+            database: "{SPANNER_CDC[DATABASE]}"
+            table: "{SPANNER_CDC[TABLE]}"
+            change_stream: "{SPANNER_CDC[CHANGE_STREAM]}"
+            start_at: "{SPANNER_CDC[START_AT]}"
+            end_at: "{SPANNER_CDC[END_AT]}"
+        - type: MapToFields
+          name: SelectOperation
+          input: ReadCdc
+          config:
+            language: python
+            fields:
+              operation: operation
+        - type: AssertEqual
+          input: SelectOperation
+          config:
+            elements:
+              - {operation: INSERT}
+              - {operation: INSERT}
+              - {operation: UPDATE}
+              - {operation: UPDATE}
+              - {operation: DELETE}
+              - {operation: DELETE}
+        - type: AssertEqual
+          input: ReadCdc.errors
+          config:
+            elements: []
+    options:
+      project: "apache-beam-testing"
+      streaming: true
