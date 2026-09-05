@@ -513,8 +513,7 @@ if __name__ == '__main__':
               'sqlalchemy-pytds>=1.0.2',
               'pg8000>=1.31.5',
               "PyMySQL>=1.1.0",
-              'oracledb>=3.1.1',
-              'google-cloud-firestore>=2.0.0,<3',
+              'oracledb>=3.1.1'
           ],
           'gcp': [
               'cachetools>=3.1.0,<7',
@@ -536,6 +535,10 @@ if __name__ == '__main__':
               # errors raised during async flushes instead of swallowing them.
               'google-cloud-bigtable>=2.42.0,<3',
               'google-cloud-build>=3.35.0,<4',
+              # Test-only for YAML Firestore ITs; kept in gcp (not test) so
+              # installing the test extra does not create a google.cloud
+              # namespace without google.cloud.storage (breaks GCS mocks).
+              'google-cloud-firestore>=2.0.0,<3',
               'google-cloud-spanner>=3.0.0,<4',
               # GCP Packages required by ML functionality
               'google-cloud-dlp>=3.0.0,<4',
