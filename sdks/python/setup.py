@@ -535,9 +535,6 @@ if __name__ == '__main__':
               # errors raised during async flushes instead of swallowing them.
               'google-cloud-bigtable>=2.42.0,<3',
               'google-cloud-build>=3.35.0,<4',
-              # Test-only for YAML Firestore ITs; kept in gcp (not test) so
-              # installing the test extra does not create a google.cloud
-              # namespace without google.cloud.storage (breaks GCS mocks).
               'google-cloud-firestore>=2.0.0,<3',
               'google-cloud-spanner>=3.0.0,<4',
               # GCP Packages required by ML functionality
