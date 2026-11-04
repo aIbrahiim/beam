@@ -14,10 +14,8 @@
 # limitations under the License.
 #
 
-torch>=1.7.1
-torchvision>=0.8.2
-pillow>=8.0.0
-transformers==4.57.1
-sentencepiece==0.2.1
-google-cloud-monitoring>=2.27.0
-openai>=1.52.2
+# Submitter-only client dependency for vLLM benchmarks/load tests.
+# Worker runtime deps come from the custom container (apache-beam[gcp,vllm]).
+# Do not add torch here: staging unconstrained torch onto workers overwrites
+# the image pin and breaks the vLLM engine.
+openai==1.107.1

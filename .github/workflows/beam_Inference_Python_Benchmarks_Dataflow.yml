@@ -116,6 +116,7 @@ jobs:
             -Prunner=DataflowRunner \
             -PsdkLocationOverride=false \
             -PpythonVersion=3.11 \
+            -PloadTest.requirementsTxtFile=apache_beam/ml/inference/vllm_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_8 }} --mode=batch --job_name=benchmark-tests-vllm-with-gemma-2b-it-batch-${{env.NOW_UTC}} --sdk_container_image=${{ steps.build_vllm_image.outputs.image_url }}'
       - name: run Pytorch Sentiment Streaming using Hugging Face distilbert-base-uncased model
         uses: ./.github/actions/gradle-command-self-hosted-action
