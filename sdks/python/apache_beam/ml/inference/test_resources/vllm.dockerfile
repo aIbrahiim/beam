@@ -28,25 +28,25 @@ RUN apt-get update && \
       curl \
       tzdata \
       software-properties-common \
-      python3.10-full \
-      python3.10-distutils \
+      python3.11 \
+      python3.11-venv \
       build-essential \
-      python3.10-dev \
+      python3.11-dev \
       cython3 && \
     ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     rm -rf /var/lib/apt/lists/*
 
-# 2) Symlink python3 to 3.10
-RUN ln -sf /usr/bin/python3.10 /usr/bin/python3 && \
-    ln -sf /usr/bin/python3.10 /usr/bin/python
+# 2) Symlink python3 to 3.11
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python
 
 # 3) Install pip, setuptools & wheel
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade pip setuptools wheel
 
 # 4) Copy the Beam SDK harness (for Dataflow workers)
-COPY --from=gcr.io/apache-beam-testing/beam-sdk/beam_python3.10_sdk:latest \
+COPY --from=gcr.io/apache-beam-testing/beam-sdk/beam_python3.11_sdk:latest \
      /opt/apache/beam /opt/apache/beam
 
 # 5) Make sure the harness is discovered first
