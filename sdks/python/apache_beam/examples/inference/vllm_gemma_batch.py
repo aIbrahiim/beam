@@ -29,6 +29,12 @@ from apache_beam.ml.inference.vllm_inference import _VLLMModelServer
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import SetupOptions
 
+# Same T4-safe defaults as vllm_text_completion.py: vLLM V1 engine startup
+# can OOM on ~16GB GPUs unless max_num_seqs and gpu_memory_utilization are
+# reduced.
+_DEFAULT_VLLM_MAX_NUM_SEQS = 32
+_DEFAULT_VLLM_GPU_MEMORY_UTILIZATION = 0.72
+
 
 class GemmaVLLMOptions(PipelineOptions):
   """Custom pipeline options for the Gemma vLLM batch inference job."""
@@ -106,7 +112,11 @@ def run(argv=None, save_main_session=True, test_pipeline=None):
   logging.info("Pipeline starting with model path: %s", gem.model_gcs_path)
   handler = GcsVLLMCompletionsModelHandler(
       model_name=gem.model_gcs_path,
-      vllm_server_kwargs={"served-model-name": gem.model_gcs_path})
+      vllm_server_kwargs={
+          "served-model-name": gem.model_gcs_path,
+          "max-num-seqs": str(_DEFAULT_VLLM_MAX_NUM_SEQS),
+          "gpu-memory-utilization": str(_DEFAULT_VLLM_GPU_MEMORY_UTILIZATION),
+      })
 
   with (test_pipeline or beam.Pipeline(options=opts)) as p:
     _ = (
