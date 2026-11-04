@@ -14,8 +14,4 @@
 # limitations under the License.
 #
 
-# Submitter-only client dependency for vLLM benchmarks/load tests.
-# Worker runtime deps come from the custom container (apache-beam[gcp,vllm]).
-# Do not add torch here: staging unconstrained torch onto workers overwrites
-# the image pin and breaks the vLLM engine.
 openai==1.107.1

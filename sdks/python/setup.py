@@ -725,7 +725,13 @@ if __name__ == '__main__':
           ],
           'milvus': milvus_dependency,
           'qdrant': qdrant_dependency,
-          'vllm': ['openai==1.107.1', 'vllm==0.10.1.1', 'triton==3.3.1']
+          # vllm 0.10.1.1 is incompatible with transformers 5.x (GemmaTokenizer).
+          'vllm': [
+              'openai==1.107.1',
+              'vllm==0.10.1.1',
+              'triton==3.3.1',
+              'transformers>=4.55.0,<5.0.0',
+          ]
       },
       zip_safe=False,
       # PyPI package information.
