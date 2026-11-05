@@ -24,12 +24,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Etc/UTC
 
 RUN apt-get update && \
+    apt-get install -y --no-install-recommends software-properties-common && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
       curl \
       tzdata \
-      software-properties-common \
-      python3.11 \
-      python3.11-venv \
+      python3.11-full \
+      python3.11-distutils \
       build-essential \
       python3.11-dev \
       cython3 && \
@@ -51,6 +53,10 @@ COPY --from=gcr.io/apache-beam-testing/beam-sdk/beam_python3.11_sdk:latest \
 
 # 5) Make sure the harness is discovered first
 ENV PYTHONPATH=/opt/apache/beam:$PYTHONPATH
+
+# Avoid XFormers on Turing GPUs (T4): vLLM 0.10.1.1 segfaults right after
+# weight load with the XFormers backend even when --enforce-eager is set.
+ENV VLLM_ATTENTION_BACKEND=TORCH
 
 # 6) Install the Beam dev SDK from the local source package.
 # This .tar.gz file will be created by GitHub Actions workflow
