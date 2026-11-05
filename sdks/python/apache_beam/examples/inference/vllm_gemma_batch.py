@@ -31,8 +31,9 @@ from apache_beam.options.pipeline_options import SetupOptions
 
 # Same T4-safe defaults as vllm_text_completion.py: vLLM engine startup can
 # OOM on ~16GB GPUs unless max_num_seqs and gpu_memory_utilization are
-# reduced. Cap max_model_len too: gemma-2b defaults to 8192, which still
-# crashes the engine on T4 after weight load (KV / profile).
+# reduced. Cap max_model_len too: gemma-2b defaults to 8192. enforce-eager
+# disables CUDA graph capture, which segfaults on T4 after weight load with
+# vllm 0.10.1.1 + XFormers (CC 7.5).
 _DEFAULT_VLLM_MAX_NUM_SEQS = 32
 _DEFAULT_VLLM_GPU_MEMORY_UTILIZATION = 0.72
 _DEFAULT_VLLM_MAX_MODEL_LEN = 2048
@@ -119,6 +120,8 @@ def run(argv=None, save_main_session=True, test_pipeline=None):
           "max-num-seqs": str(_DEFAULT_VLLM_MAX_NUM_SEQS),
           "gpu-memory-utilization": str(_DEFAULT_VLLM_GPU_MEMORY_UTILIZATION),
           "max-model-len": str(_DEFAULT_VLLM_MAX_MODEL_LEN),
+          # Flag-only; _append_kwargs omits the value when None.
+          "enforce-eager": None,
       })
 
   with (test_pipeline or beam.Pipeline(options=opts)) as p:
