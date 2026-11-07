@@ -103,6 +103,7 @@ jobs:
       - name: get current time
         run: echo "NOW_UTC=$(date '+%m%d%H%M%S' --utc)" >> $GITHUB_ENV
       - name: Build VLLM Development Image
+        if: false
         id: build_vllm_image
         uses: ./.github/actions/build-push-docker-action
         with:
@@ -110,6 +111,7 @@ jobs:
           image_name: 'us-docker.pkg.dev/apache-beam-testing/beam-temp/beam-vllm-gpu-base'
           image_tag: ${{ github.sha }}
       - name: Run VLLM Gemma Batch Test
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -121,6 +123,7 @@ jobs:
             -PpythonVersion=3.11 \
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/vllm_tests_requirements.txt '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_8 }} --mode=batch --job_name=benchmark-tests-vllm-with-gemma-2b-it-batch-${{env.NOW_UTC}} --sdk_container_image=${{ steps.build_vllm_image.outputs.image_url }}'
       - name: run Pytorch Sentiment Streaming using Hugging Face distilbert-base-uncased model
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -132,6 +135,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_6 }} --mode=streaming --job_name=benchmark-tests-pytorch-sentiment-distilbert-base-uncased-streaming-${{env.NOW_UTC}} --output_table=apache-beam-testing.beam_run_inference.result_sentiment_distilbert_base_uncased' \
       - name: run Pytorch Sentiment Batch using Hugging Face distilbert-base-uncased model
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
