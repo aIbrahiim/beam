@@ -144,6 +144,13 @@ class PostProcessDoFn(beam.DoFn):
 # ============ Model Handlers ============
 
 
+class _ModelAndProcessor(object):
+  """Bundle returned by load_model(); must support weakrefs for Shared."""
+  def __init__(self, model, processor):
+    self.model = model
+    self.processor = processor
+
+
 class BlipCaptionModelHandler(ModelHandler):
   def __init__(
       self,
@@ -166,7 +173,7 @@ class BlipCaptionModelHandler(ModelHandler):
     model = BlipForConditionalGeneration.from_pretrained(self.model_name)
     model.to(self.device)
     model.eval()
-    return (model, processor)
+    return _ModelAndProcessor(model, processor)
 
   def batch_elements_kwargs(self):
     return {"max_batch_size": self.batch_size}
@@ -174,7 +181,7 @@ class BlipCaptionModelHandler(ModelHandler):
   def run_inference(
       self, batch: List[Dict[str, Any]], model_bundle, inference_args=None):
 
-    model, processor = model_bundle
+    model, processor = model_bundle.model, model_bundle.processor
     start = now_millis()
 
     images = [x["image"] for x in batch]
@@ -238,7 +245,7 @@ class ClipRankModelHandler(ModelHandler):
     model = CLIPModel.from_pretrained(self.model_name)
     model.to(self.device)
     model.eval()
-    return (model, processor)
+    return _ModelAndProcessor(model, processor)
 
   def batch_elements_kwargs(self):
     return {"max_batch_size": self.batch_size}
@@ -246,7 +253,7 @@ class ClipRankModelHandler(ModelHandler):
   def run_inference(
       self, batch: List[Dict[str, Any]], model_bundle, inference_args=None):
 
-    model, processor = model_bundle
+    model, processor = model_bundle.model, model_bundle.processor
     start_batch = now_millis()
 
     # Flat lists for a single batched CLIP forward pass
