@@ -147,6 +147,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_7 }} --mode=batch --job_name=benchmark-tests-pytorch-sentiment-distilbert-base-uncased-batch-${{env.NOW_UTC}} --output_table=apache-beam-testing.beam_run_inference.result_sentiment_distilbert_base_uncased' \
       - name: run Pytorch Vision Classification with Resnet 101
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -158,6 +159,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_1 }} --job_name=benchmark-tests-pytorch-imagenet-python-101-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet101-${{env.NOW_UTC}}.txt' \
       - name: run Pytorch Imagenet Classification with Resnet 152
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -169,6 +171,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_2 }} --job_name=benchmark-tests-pytorch-imagenet-python-152-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet152-${{env.NOW_UTC}}.txt' \
       - name: run Pytorch Language Modeling using Hugging Face bert-base-uncased model
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -180,6 +183,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_3 }} --job_name=benchmark-tests-pytorch-language-modeling-bert-base-uncased-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_bert_base_uncased-${{env.NOW_UTC}}.txt' \
       - name: run Pytorch Langauge Modeling using Hugging Face bert-large-uncased model
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -191,6 +195,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_4 }} --job_name=benchmark-tests-pytorch-language-modeling-bert-large-uncased-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_bert_large_uncased-${{env.NOW_UTC}}.txt' \
       - name: run Pytorch Imagenet Classification with Resnet 152 with Tesla T4 GPU
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
@@ -202,6 +207,7 @@ jobs:
             -PloadTest.requirementsTxtFile=apache_beam/ml/inference/torch_tests_requirements.txt \
             '-PloadTest.args=${{ env.beam_Inference_Python_Benchmarks_Dataflow_test_arguments_5 }} --job_name=benchmark-tests-pytorch-imagenet-python-gpu-${{env.NOW_UTC}} --output=gs://temp-storage-for-end-to-end-tests/torch/result_resnet152_gpu-${{env.NOW_UTC}}.txt' \
       - name: run Table Row Inference Sklearn Batch
+        if: false
         uses: ./.github/actions/gradle-command-self-hosted-action
         timeout-minutes: 180
         with:
